@@ -39,3 +39,4 @@ env/
 # --- macOS ---
 .DS_Store
 spike_log.jsonl
+venv/

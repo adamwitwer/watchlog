@@ -51,8 +51,11 @@ never exposed to the internet. The only public surface is one flat HTML file.
 Watched threshold: 90% complete. Chosen deliberately; it matches Plex's own scrobble
 point, so both sensors agree on what "watched" means.
 
-Netflix in a browser: accepted gap for v1. Only Netflix watched on the Apple TV box
-gets logged. Revisit if it turns out to bother me.
+Netflix: OUT of v1 entirely, decided after Phase 0 measured what the Apple TV actually
+reports (nothing -- see findings). Not a browser-only gap as originally assumed. The
+only remaining route is scraping netflix.com/viewingactivity, which is deferred to its
+own later phase rather than allowed to gate the parts that work. v1 is Plex and
+Apple TV+. The README says so plainly, so the gap reads as a decision and not a bug.
 
 Safety valve: none. Fully instant publish, delete after the fact. I said no
 confirmation and I meant it.
@@ -150,14 +153,20 @@ Phase 1 -- Plex end to end.
   source. Everything after is additive.
 
 Phase 2 -- Apple TV.
-  pyatv push listener, the watched-threshold state machine, reconnect handling, and the
-  dedup rules. Adds Apple TV+ and (pending Phase 0) Netflix.
+  pyatv push listener for start/stop/switch, PLUS interval polling of metadata.playing()
+  for position (push alone never sees the 90% crossing). The watched-threshold state
+  machine, reconnect-with-backoff, and the dedup rules. Adds Apple TV+ at series level.
 
 Phase 3 -- TMDb enrichment.
   Resolve Apple TV titles to IMDb IDs and years. Cache and manual-override.
 
 Phase 4 -- Admin delete UI.
   Until this ships, deleting means one SQL statement over SSH, which is survivable.
+
+Phase 5 -- Netflix, only if the gap proves annoying.
+  Playwright with a saved session against netflix.com/viewingactivity, run nightly and
+  deduped against everything already logged. Covers Netflix everywhere, at the cost of
+  the most fragile component in the system. Deliberately last.
 
 Later, if ever: ratings, notes, an RSS feed of the log, year-end stats.
 

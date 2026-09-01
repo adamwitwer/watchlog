@@ -1,0 +1,15 @@
+[Unit]
+Description=Watchlog Plex webhook receiver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=adam
+WorkingDirectory=/home/adam/Projects/watchlog
+ExecStart=/home/adam/Projects/watchlog/venv/bin/python -m watchlog.plex_webhook
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
