@@ -1,0 +1,159 @@
+Watchlog
+
+Problem the app must solve: I watch things across Plex, Apple TV, and Netflix and
+there's no single record of it. I want a page at adamwitwer.com/watchlog that keeps
+a running list automatically, newest on top, with no confirmation step and nothing
+for me to maintain by hand. If I have to think about it, it has failed.
+
+Users: 1 (me). Readers: anyone who visits the page.
+
+App features:
+* Automatically detects what I've watched. No confirmation, no manual entry.
+* Publishes to a simple list at adamwitwer.com/watchlog, newest first.
+* Large type, modern, text-only. No posters. Should look like an editorial list,
+  not a streaming grid.
+* Each entry: title + year, date watched, IMDb link, small service badge.
+* I can delete an entry. That's the only interaction I want to have with it.
+* Emphasis on simplicity and speed. The page should be a flat file that loads instantly.
+* Later, maybe: ratings, notes. Probably not. Don't build for them now.
+
+Platforms available (verified 2026-09-01):
+* Raspberry Pi 5 -- Debian bookworm, Python 3.11.2, always on, on the LAN and the
+  Tailnet. Already runs hydrawise-watcher. This is where Watchlog lives.
+* Plex server -- a Mac mini (Mac14,3) on the same flat subnet as the Pi, so the webhook
+  is a plain LAN call; Tailscale isn't even needed for it.
+* Apple TV -- Apple TV 4K gen 3 (AppleTV14,1), tvOS 26.6, on that same subnet.
+  Discovered by pyatv 0.18.0 from the Pi. AirPlay and Companion both present, both
+  Pairing: Mandatory.
+* adamwitwer.com -- NearlyFreeSpeech.NET. Real SSH, so rsync over SSH into
+  /home/public/watchlog/. Billed by storage and bandwidth; a single small HTML file is
+  a rounding error on an account that already serves the site.
+* Also on the LAN: a Roku 4K. Out of scope, noted in case it matters later.
+* Render account exists (crits-fumbles, notes-app). Usual GitHub for version control.
+
+
+DECISIONS (locked in planning)
+
+Devices I actually watch on: Apple TV 4K box most of the time, browser on a Mac second,
+iPhone/iPad occasionally.
+
+Plex: self-hosted, with Plex Pass. -> Native webhooks. Instant, device-independent,
+and Plex hands us IMDb IDs directly.
+
+Binge grouping: group by show + night. Movies get their own entry; episodes collapse
+into one line per show per night ("Severance, S2 E3-E6").
+
+Publishing: the Pi renders a static watchlog.html and rsyncs it to NearlyFreeSpeech
+over SSH. No new hosting, no public API, no database on the server. Everything with
+moving parts -- collectors, SQLite, the admin UI -- runs on the Pi for free and is
+never exposed to the internet. The only public surface is one flat HTML file.
+
+Watched threshold: 90% complete. Chosen deliberately; it matches Plex's own scrobble
+point, so both sensors agree on what "watched" means.
+
+Netflix in a browser: accepted gap for v1. Only Netflix watched on the Apple TV box
+gets logged. Revisit if it turns out to bother me.
+
+Safety valve: none. Fully instant publish, delete after the fact. I said no
+confirmation and I meant it.
+
+
+HOW IT WORKS
+
+Two sensors, one store, one renderer. All of it on the Pi.
+
+1. Plex webhook listener. Plex Pass fires a webhook on every media.scrobble (~90%
+   watched). The Pi runs a small Flask endpoint on the LAN; the Plex server posts to it
+   directly, so nothing is exposed to the internet. Payload includes show/season/episode,
+   year, and a Guid array with imdb:// and tmdb:// IDs, so Plex entries need no lookup
+   at all. Filter to my account. Covers Plex on every device -- box, browser, phone.
+
+2. Apple TV listener (pyatv). A persistent push-update connection to the Apple TV 4K.
+   pyatv reports the playing title, artwork, position/duration, and critically WHICH APP
+   is playing -- so we get service attribution for free. Covers Apple TV+ and Netflix
+   on the box. A local state machine watches for a title to reach ~85% complete (or
+   accumulate 20+ minutes) and then stop or change, and logs it at that point.
+
+3. Dedup. Plex played on the Apple TV box would otherwise be seen twice. Cheap exact
+   fix: ignore any pyatv event where the reported app is Plex. Beyond that, a
+   normalized key of (title, season, episode, type) within a 4-hour window collapses
+   duplicates, preferring whichever source has richer metadata.
+
+4. Enrichment. Plex entries already carry IMDb IDs. Apple TV entries carry only strings,
+   so those get a TMDb search (free API) to resolve title -> tmdb_id, imdb_id, year.
+   Results cached in a titles table so we look up each show once. A manual override
+   column for when the match is wrong.
+
+5. Store. SQLite on the Pi. One entries table (raw watch events), one titles table
+   (resolved metadata), a hidden flag for deletes.
+
+6. Render + push. Jinja2 template -> a single self-contained watchlog.html with inline
+   CSS, no JavaScript. Debounced ~60s after any new entry, then rsync over SSH to the
+   web host. Delete triggers the same re-render and push.
+
+7. Delete. A small Flask admin page on the Pi, reachable only over the LAN or the
+   Tailnet. Recent entries with a hide button each. Sets hidden=1, re-renders, re-pushes.
+   Deleting a grouped entry removes the whole group.
+
+Page design: max-width around 40rem, large title type, muted metadata line beneath,
+generous line height, light/dark via prefers-color-scheme. Title links to IMDb. Service
+badge in small caps. Nothing else.
+
+
+PHASES
+
+Phase 0 -- Spike (this evening, before any real code).
+  DONE: pyatv 0.18.0 installed in a venv on the Pi. The Apple TV is discovered, on the
+  same subnet, mDNS working.
+  REMAINING, and it needs Adam physically at the TV: pair the Companion and AirPlay
+  protocols (each shows a 4-digit PIN on the television that has to be typed back into
+  the pairing prompt -- there is no remote path to this). Then play a few minutes of
+  Netflix and a few of Apple TV+ while a push listener logs everything that arrives.
+  This decides whether Netflix is in v1 at all. Nothing else is worth building until
+  we know. Credentials are stored once and reused forever after.
+
+Phase 1 -- Plex end to end.
+  Webhook listener, SQLite, grouping, Jinja2 render, rsync to the host. IMDb links come
+  free from Plex GUIDs. At the end of this phase the page is live and real, with one
+  source. Everything after is additive.
+
+Phase 2 -- Apple TV.
+  pyatv push listener, the watched-threshold state machine, reconnect handling, and the
+  dedup rules. Adds Apple TV+ and (pending Phase 0) Netflix.
+
+Phase 3 -- TMDb enrichment.
+  Resolve Apple TV titles to IMDb IDs and years. Cache and manual-override.
+
+Phase 4 -- Admin delete UI.
+  Until this ships, deleting means one SQL statement over SSH, which is survivable.
+
+Later, if ever: ratings, notes, an RSS feed of the log, year-end stats.
+
+
+RISKS AND OPEN QUESTIONS
+
+1. RESOLVED. The host is NearlyFreeSpeech.NET with real SSH, so rsync over SSH into
+   /home/public/watchlog/ works and the /watchlog path is safe. Needs an SSH key from
+   the Pi added to the NFSN account so the push can run unattended.
+
+2. Netflix metadata quality on tvOS is unknown. The Apple TV app reports cleanly;
+   Netflix has historically been stingy about series/season/episode structure and may
+   give us only an episode title. Phase 0 answers this. Worst case Netflix drops out
+   of v1 and we revisit with the viewingactivity scrape.
+
+3. pyatv fragility. Connections drop when the Apple TV sleeps, so the listener needs
+   reconnect-with-backoff. tvOS updates occasionally break pairing and require re-pairing
+   by hand, which means physical access to the TV again. The mDNS/VLAN concern is
+   resolved -- the Pi and the Apple TV are on one flat subnet and discovery works.
+
+4. TMDb mismatches on ambiguous or generic titles. Mitigated by the override column,
+   but some entries will need a manual touch.
+
+5. Deletes are not retroactive. Removing an entry takes it off the page but not out of
+   anyone's cache, or out of an RSS reader if we ever add one. Accepted.
+
+6. Watched threshold set at 90%, matching Plex. Still worth watching for false
+   positives from trailers and abandoned starts once real data accumulates.
+
+7. Deliberately not building: a blocklist. I chose instant publish. Worth revisiting
+   only if something embarrassing ends up on the page and delete feels too slow.

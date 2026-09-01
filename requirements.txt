@@ -1,0 +1,14 @@
+# Apple TV listener
+pyatv>=0.18.0
+
+# Plex webhook receiver + admin/delete UI
+Flask>=3.0
+
+# Page rendering
+Jinja2>=3.1
+
+# TMDb enrichment
+requests>=2.31
+
+# Config
+python-dotenv>=1.0

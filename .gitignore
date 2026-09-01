@@ -1,0 +1,40 @@
+# --- Watchlog privacy: this repo is public, the watch history is not ---
+# The database holds every watch event, INCLUDING entries deleted from the page.
+watchlog.db
+*.db
+*.sqlite3
+*.sqlite3-journal
+
+# The rendered page is generated output. It is public on the website anyway, but
+# committing it would give git a permanent record of everything ever deleted.
+watchlog.html
+out/
+data/
+
+# Apple TV pairing credentials, in whatever form pyatv writes them
+credentials/
+*.credentials
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+venv/
+.venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.log
+
+# --- macOS ---
+.DS_Store
