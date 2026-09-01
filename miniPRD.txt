@@ -100,17 +100,49 @@ generous line height, light/dark via prefers-color-scheme. Title links to IMDb. 
 badge in small caps. Nothing else.
 
 
+PHASE 0 FINDINGS (measured, not assumed)
+
+Netflix reports NOTHING. While actively playing, the Apple TV exposes only the bundle
+identifier com.netflix.Netflix. title, series_name, season_number, episode_number,
+position, total_time, content_identifier: all None. media_type Unknown. We can tell
+that Netflix is open. We cannot tell what is playing, or how far in. There is no
+threshold to compute and no title to log. Netflix cannot be captured from the box.
+
+The Apple TV app works, at series level. Observed:
+    app          TV [com.apple.TVWatchList]
+    media_type   Video
+    title        'Dark Matter'          <- the SERIES name, not the episode title
+    total_time   2917                   <- 48.6 min, so this is an episode
+    content_id   'A0052201001'
+    itunes_id    '1727880953'
+    series_name / season_number / episode_number: all None
+So we learn the show and the progress, but not which episode. That lands very close to
+the display we already chose -- grouping by show and night -- and costs us only the
+"S2 E3-E6" range, which Plex still provides for its own entries.
+
+The iTunes identifier is a dead end. https://itunes.apple.com/lookup?id=1727880953
+returns resultCount 0, with or without country/entity, and a title search for the show
+returns nothing either. Apple TV+ originals aren't in the legacy iTunes catalog.
+Enrichment for Apple TV entries falls back to TMDb search by title, which carries a
+real ambiguity risk: "Dark Matter" is both the 2024 Apple TV+ series and a 2015 Syfy
+one. Mitigated by the manual override column, the known duration, and the watch date.
+
+Push updates fire on STATE CHANGE only, not continuously. 55 seconds of steady playback
+produced exactly one update. The listener alone will therefore never observe the moment
+something crosses 90%. Phase 2 must poll metadata.playing() on an interval (30-60s)
+while a title is playing, and treat push updates as the signal for start/stop/switch.
+This is a correction to the original design.
+
+Incidentally, YouTube TV reports more than Netflix does: title plus channel as artist
+("Men's & Women's First Round" / "ESPN"). Out of scope, but it means a future source
+is cheap if ever wanted.
+
+
 PHASES
 
-Phase 0 -- Spike (this evening, before any real code).
-  DONE: pyatv 0.18.0 installed in a venv on the Pi. The Apple TV is discovered, on the
-  same subnet, mDNS working.
-  REMAINING, and it needs Adam physically at the TV: pair the Companion and AirPlay
-  protocols (each shows a 4-digit PIN on the television that has to be typed back into
-  the pairing prompt -- there is no remote path to this). Then play a few minutes of
-  Netflix and a few of Apple TV+ while a push listener logs everything that arrives.
-  This decides whether Netflix is in v1 at all. Nothing else is worth building until
-  we know. Credentials are stored once and reused forever after.
+Phase 0 -- Spike. COMPLETE, 2026-09-01.
+  pyatv 0.18.0 on the Pi, Companion and AirPlay both paired (275-char credentials each,
+  in .env). A push listener captured 20 updates across three apps. Findings below.
 
 Phase 1 -- Plex end to end.
   Webhook listener, SQLite, grouping, Jinja2 render, rsync to the host. IMDb links come
@@ -136,10 +168,10 @@ RISKS AND OPEN QUESTIONS
    /home/public/watchlog/ works and the /watchlog path is safe. Needs an SSH key from
    the Pi added to the NFSN account so the push can run unattended.
 
-2. Netflix metadata quality on tvOS is unknown. The Apple TV app reports cleanly;
-   Netflix has historically been stingy about series/season/episode structure and may
-   give us only an episode title. Phase 0 answers this. Worst case Netflix drops out
-   of v1 and we revisit with the viewingactivity scrape.
+2. RESOLVED, badly. Netflix reports no metadata at all from the Apple TV (see Phase 0
+   findings). The only remaining route to Netflix is scraping netflix.com/viewingactivity
+   with a saved session -- which would cover all Netflix everywhere, but is the single
+   most fragile component anyone could add to this design, and lags up to 24h.
 
 3. pyatv fragility. Connections drop when the Apple TV sleeps, so the listener needs
    reconnect-with-backoff. tvOS updates occasionally break pairing and require re-pairing
