@@ -10,12 +10,17 @@ Design and decisions: [`miniPRD.txt`](miniPRD.txt)
 
 ## Status
 
-**Phase 0 — spike.** `pyatv` is installed on the Pi and discovers the Apple TV. What
-remains is pairing (needs physical access to the TV, since tvOS shows the PIN on screen)
-and a metadata dump to find out what Netflix and the Apple TV app actually report.
+**Phase 0 — complete.** The Apple TV is paired over Companion and AirPlay, and a push
+listener captured what each app reports. The finding that mattered: **Netflix reports no
+metadata at all** — while it is actively playing, the Apple TV exposes only the bundle
+identifier, with no title, position, or duration. Netflix is therefore out of v1. The
+Apple TV app works, at series level.
 
-Phases 1–4 — Plex end to end, the Apple TV listener, TMDb enrichment, and the delete
-UI — are described in the miniPRD.
+**Phase 1 — built.** Plex webhook receiver, SQLite storage, night-grouping, the rendered
+page, and the rsync publisher. Running as `watchlog-webhook.service` on the Pi.
+
+Phases 2–4 — the Apple TV listener, TMDb enrichment, and the delete UI — are described
+in the miniPRD. Netflix is Phase 5, and only if the gap proves annoying.
 
 ## How it works
 
@@ -26,8 +31,9 @@ HTML file and rsyncs it to the web host.
   covers Plex on the TV, in a browser, and on a phone. Plex supplies IMDb IDs directly,
   so those entries need no lookup.
 - **Apple TV** — a `pyatv` push listener on the Pi holds a connection to the Apple TV 4K
-  and reports the playing title, position, and *which app* is playing. That last part
-  gives service attribution for free, and covers Apple TV+ and Netflix on the box.
+  and reports the playing title, position, and *which app* is playing. Push updates fire
+  only on state change, so the collector also polls position on an interval. Covers
+  Apple TV+ at series level: we learn the show and the progress, but not the episode.
 - **Dedup** — Plex played on the Apple TV would otherwise be counted twice, so pyatv
   events reporting the Plex app are ignored.
 - **Enrichment** — TMDb resolves Apple TV titles to IMDb IDs and years.
@@ -39,9 +45,11 @@ only public surface is a flat HTML file.
 
 ### Known gaps
 
-Netflix watched in a browser isn't captured — only Netflix on the Apple TV. That's a
-deliberate v1 tradeoff to avoid maintaining a scraper. A Roku on the same network is
-also invisible to both sensors.
+**Netflix isn't captured at all.** Not a design choice so much as a measured limit: the
+Apple TV reports no metadata whatsoever for Netflix, and a browser is invisible to
+`pyatv` anyway. The only route left is scraping Netflix's viewing activity page, which
+is deferred rather than allowed to hold up the parts that work. A Roku on the same
+network is likewise invisible.
 
 ## Configuration
 
