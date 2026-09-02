@@ -160,7 +160,7 @@ Phase 2 -- Apple TV. COMPLETE, running as watchlog-appletv.service.
 Phase 3 -- TMDb enrichment. COMPLETE.
   Resolve Apple TV titles to IMDb IDs and years. Cache and manual-override.
 
-Phase 4 -- Admin delete UI. NEXT.
+Phase 4 -- Admin delete UI. COMPLETE. v1 done.
   Until this ships, deleting means one SQL statement over SSH, which is survivable.
 
 Phase 5 -- Netflix, only if the gap proves annoying.

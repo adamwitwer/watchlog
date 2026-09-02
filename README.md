@@ -28,8 +28,11 @@ allowlisted, which is also what keeps Plex-on-the-Apple-TV from being counted tw
 **Phase 3 — running.** TMDb resolves Apple TV titles to IMDb ids and years, cached, with
 a `locked` flag for correcting a bad match by hand.
 
-Phase 4 — the delete UI — is next. Netflix is Phase 5, and only if the gap proves
-annoying.
+**Phase 4 — running.** A small delete UI on the Pi (`watchlog-admin.service`), bound to
+the LAN and Tailnet only. Deleting hides rather than destroys and republishes
+immediately; removed entries can be restored.
+
+**v1 is complete.** Netflix is Phase 5, and only if the gap proves annoying.
 
 ## How it works
 
@@ -47,7 +50,10 @@ HTML file and rsyncs it to the web host.
   events reporting the Plex app are ignored.
 - **Enrichment** — TMDb resolves Apple TV titles to IMDb IDs and years.
 - **Publish** — Jinja2 renders one self-contained HTML file; rsync over SSH puts it on
-  NearlyFreeSpeech.
+  NearlyFreeSpeech, alongside an `.htaccess` that stops the host's edge cache serving a
+  stale page for a quarter of an hour after every publish.
+- **Delete** — a private admin page on the Pi lists what's published, with a button per
+  entry. Hiding is reversible.
 
 Everything with moving parts runs on the Pi and is never exposed to the internet. The
 only public surface is a flat HTML file.
