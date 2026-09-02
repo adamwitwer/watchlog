@@ -3,6 +3,7 @@
 
 Run: python -m tests.test_tracker
 """
+import math
 import sys
 from pathlib import Path
 
@@ -35,8 +36,10 @@ print("Tracker")
 t = Tracker()
 check("below threshold logs nothing", observe(t, pos=1000) is None)
 check("at 89% logs nothing", observe(t, pos=int(2917 * 0.89)) is None)
+# int() truncation lands at 89.99%, which must NOT trip the threshold.
+check("at 89.99% logs nothing", observe(t, pos=int(2917 * 0.90)) is None)
 
-event = observe(t, pos=int(2917 * 0.90))
+event = observe(t, pos=math.ceil(2917 * 0.90))
 check("at 90% produces an event", event is not None)
 check("event is attributed to Apple TV", event and event["service"] == "Apple TV")
 check("event carries no episode numbers", event and event["season"] is None)
