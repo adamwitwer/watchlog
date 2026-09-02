@@ -43,6 +43,12 @@ NIGHT_ROLLOVER_HOUR = 4
 # Matches Plex's own media.scrobble trigger, so both sensors agree.
 WATCHED_THRESHOLD = 0.90
 
+# Plex records a second view when an episode is finished in a later session,
+# so the same episode arrives twice, typically 8-23 hours apart. Four hours was
+# too narrow to catch that. Genuine rewatches inside two days are rare; the
+# artifact is not.
+DEDUP_WINDOW_HOURS = 48
+
 # The database keeps everything. The page shows this many entries, so a full
 # history backfill doesn't turn a scannable list into an endless scroll.
 PAGE_LIMIT = 150

@@ -69,8 +69,8 @@ def insert_event(event):
         existing = conn.execute(
             """SELECT id FROM events
                WHERE dedup_key = ?
-                 AND ABS(julianday(watched_at) - julianday(?)) * 24 < 4""",
-            (event["dedup_key"], event["watched_at"]),
+                 AND ABS(julianday(watched_at) - julianday(?)) * 24 < ?""",
+            (event["dedup_key"], event["watched_at"], config.DEDUP_WINDOW_HOURS),
         ).fetchone()
         if existing:
             return None
