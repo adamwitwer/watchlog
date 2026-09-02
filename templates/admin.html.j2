@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watchlog admin</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --fg: #16151a; --muted: #6d6a75;
+    --rule: #e3e0da; --accent: #c2762a; --danger: #a8352b; --card: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131217; --fg: #f0eeea; --muted: #918d99;
+      --rule: #2a2830; --accent: #fdb041; --danger: #e8756a; --card: #1b1a21;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Helvetica, Arial, sans-serif;
+    line-height: 1.45; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 44rem; margin: 0 auto; padding: 2rem 1.25rem 5rem; }
+  h1 { font-size: 1.35rem; margin: 0 0 0.3rem; letter-spacing: -0.02em; }
+  h2 {
+    font-size: 0.75rem; letter-spacing: 0.11em; text-transform: uppercase;
+    color: var(--muted); margin: 2.5rem 0 0.75rem; font-weight: 600;
+  }
+  .note { color: var(--muted); font-size: 0.88rem; margin: 0 0 1.5rem; }
+  .note a { color: var(--accent); }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    padding: 0.7rem 0.85rem; border: 1px solid var(--rule);
+    border-radius: 8px; margin-bottom: 0.4rem; background: var(--card);
+  }
+  .body { flex: 1; min-width: 0; }
+  .title { font-size: 1.02rem; font-weight: 600; letter-spacing: -0.01em; }
+  .title .detail { font-weight: 400; color: var(--muted); }
+  .meta {
+    font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--muted); margin-top: 0.15rem;
+  }
+  .badge { color: var(--accent); }
+  .count { color: var(--muted); text-transform: none; letter-spacing: 0; }
+
+  button {
+    font: inherit; font-size: 0.8rem; cursor: pointer;
+    background: none; border: 1px solid var(--rule); color: var(--muted);
+    padding: 0.3rem 0.7rem; border-radius: 6px; white-space: nowrap;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  button:hover { border-color: var(--danger); color: var(--danger); }
+  .restore button:hover { border-color: var(--accent); color: var(--accent); }
+  .empty { color: var(--muted); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Watchlog admin</h1>
+  <p class="note">
+    Deleting hides an entry and republishes immediately. Nothing is destroyed, so
+    anything removed can be restored below.
+    The published page shows the most recent {{ published }} entries —
+    <a href="https://adamwitwer.com/watchlog/">view it</a>.
+  </p>
+
+  <h2>Published — {{ visible|length }} entries</h2>
+  {% if visible %}
+  <ul>
+    {% for entry in visible %}
+    <li>
+      <div class="body">
+        <div class="title">
+          {{ entry.title }}
+          {%- if entry.detail %} <span class="detail">{{ entry.detail }}</span>{% endif %}
+        </div>
+        <div class="meta">
+          {{ entry.date_label }} / <span class="badge">{{ entry.service }}</span>
+          {%- if entry.ids|length > 1 %}
+          / <span class="count">{{ entry.ids|length }} events</span>
+          {%- endif %}
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('hide') }}">
+        <input type="hidden" name="ids" value="{{ entry.id_list }}">
+        <button type="submit">Delete</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">Nothing published yet.</p>
+  {% endif %}
+
+  <h2>Deleted — {{ hidden|length }} entries</h2>
+  {% if hidden %}
+  <ul>
+    {% for entry in hidden %}
+    <li>
+      <div class="body">
+        <div class="title">
+          {{ entry.title }}
+          {%- if entry.detail %} <span class="detail">{{ entry.detail }}</span>{% endif %}
+        </div>
+        <div class="meta">
+          {{ entry.date_label }} / <span class="badge">{{ entry.service }}</span>
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('restore') }}" class="restore">
+        <input type="hidden" name="ids" value="{{ entry.id_list }}">
+        <button type="submit">Restore</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty">Nothing deleted.</p>
+  {% endif %}
+
+</div>
+</body>
+</html>
