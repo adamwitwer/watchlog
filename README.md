@@ -16,8 +16,10 @@ metadata at all** — while it is actively playing, the Apple TV exposes only th
 identifier, with no title, position, or duration. Netflix is therefore out of v1. The
 Apple TV app works, at series level.
 
-**Phase 1 — built.** Plex webhook receiver, SQLite storage, night-grouping, the rendered
-page, and the rsync publisher. Running as `watchlog-webhook.service` on the Pi.
+**Phase 1 — live** at [adamwitwer.com/watchlog](https://adamwitwer.com/watchlog).
+Plex webhook receiver, SQLite storage, night-grouping, the rendered page, and the rsync
+publisher, running as `watchlog-webhook.service` on the Pi. Backfilled from Plex's own
+watch history, so the page started populated rather than empty.
 
 Phases 2–4 — the Apple TV listener, TMDb enrichment, and the delete UI — are described
 in the miniPRD. Netflix is Phase 5, and only if the gap proves annoying.
@@ -50,6 +52,18 @@ Apple TV reports no metadata whatsoever for Netflix, and a browser is invisible 
 `pyatv` anyway. The only route left is scraping Netflix's viewing activity page, which
 is deferred rather than allowed to hold up the parts that work. A Roku on the same
 network is likewise invisible.
+
+## Backfill
+
+Plex keeps its own watch history, so the log didn't have to start from zero:
+
+```
+python -m watchlog.plex_history --dry-run   # show what would be imported
+python -m watchlog.plex_history             # import it
+```
+
+Apple TV has no equivalent — `pyatv` only reports what is playing right now, so
+Apple TV+ entries can only accumulate from the moment the listener starts running.
 
 ## Configuration
 
