@@ -18,7 +18,7 @@ import pyatv
 from pyatv.const import DeviceState, Protocol
 from pyatv.interface import DeviceListener, PushListener
 
-from . import config, db, publish, render
+from . import config, db, enrich, publish, render
 from .grouping import night_of, normalize
 
 log = logging.getLogger("watchlog.appletv")
@@ -145,6 +145,9 @@ class Collector:
     @staticmethod
     def _publish_now():
         try:
+            # Apple TV entries arrive with only a title, so they are resolved
+            # to an IMDb id and year before the page is built.
+            enrich.enrich_pending()
             render.write_page()
             publish.push()
         except Exception:
