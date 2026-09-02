@@ -1,0 +1,6 @@
+# Watchlog updates whenever something is watched, so the edge cache must not
+# hold a stale page for long. Without this, NearlyFreeSpeech served a cached
+# copy for 15+ minutes after a publish.
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=60, must-revalidate"
+</IfModule>
