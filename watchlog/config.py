@@ -54,4 +54,14 @@ DEDUP_WINDOW_HOURS = 48
 PAGE_LIMIT = 150
 
 PLEX_SERVER_URL = _get("PLEX_SERVER_URL", "")
+
+# Push updates fire only on state change, so position has to be polled.
+APPLETV_POLL_SECONDS = 30
+
+# An allowlist rather than a blocklist: only these apps are logged. This is also
+# what keeps Plex-on-the-Apple-TV from being counted twice, since the Plex
+# webhook already reports it regardless of which device played it.
+APPLETV_APPS = {
+    "com.apple.TVWatchList": "Apple TV",
+}
 PLEX_TOKEN = _get("PLEX_TOKEN", "")
