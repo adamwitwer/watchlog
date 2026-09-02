@@ -18,7 +18,7 @@ def _date_label(iso):
 
 
 def build_html():
-    entries = group(db.visible_events())
+    entries = group(db.visible_events())[: config.PAGE_LIMIT]
     for entry in entries:
         entry["date_label"] = _date_label(entry["watched_at"])
 

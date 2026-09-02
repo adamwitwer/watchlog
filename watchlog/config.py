@@ -42,3 +42,10 @@ NIGHT_ROLLOVER_HOUR = 4
 
 # Matches Plex's own media.scrobble trigger, so both sensors agree.
 WATCHED_THRESHOLD = 0.90
+
+# The database keeps everything. The page shows this many entries, so a full
+# history backfill doesn't turn a scannable list into an endless scroll.
+PAGE_LIMIT = 150
+
+PLEX_SERVER_URL = _get("PLEX_SERVER_URL", "")
+PLEX_TOKEN = _get("PLEX_TOKEN", "")
