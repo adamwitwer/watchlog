@@ -21,8 +21,15 @@ Plex webhook receiver, SQLite storage, night-grouping, the rendered page, and th
 publisher, running as `watchlog-webhook.service` on the Pi. Backfilled from Plex's own
 watch history, so the page started populated rather than empty.
 
-Phases 2–4 — the Apple TV listener, TMDb enrichment, and the delete UI — are described
-in the miniPRD. Netflix is Phase 5, and only if the gap proves annoying.
+**Phase 2 — running.** `watchlog-appletv.service` holds a `pyatv` connection to the
+Apple TV, using push updates for session boundaries and polling for position. Apps are
+allowlisted, which is also what keeps Plex-on-the-Apple-TV from being counted twice.
+
+**Phase 3 — running.** TMDb resolves Apple TV titles to IMDb ids and years, cached, with
+a `locked` flag for correcting a bad match by hand.
+
+Phase 4 — the delete UI — is next. Netflix is Phase 5, and only if the gap proves
+annoying.
 
 ## How it works
 

@@ -152,15 +152,15 @@ Phase 1 -- Plex end to end.
   free from Plex GUIDs. At the end of this phase the page is live and real, with one
   source. Everything after is additive.
 
-Phase 2 -- Apple TV.
+Phase 2 -- Apple TV. COMPLETE, running as watchlog-appletv.service.
   pyatv push listener for start/stop/switch, PLUS interval polling of metadata.playing()
   for position (push alone never sees the 90% crossing). The watched-threshold state
   machine, reconnect-with-backoff, and the dedup rules. Adds Apple TV+ at series level.
 
-Phase 3 -- TMDb enrichment.
+Phase 3 -- TMDb enrichment. COMPLETE.
   Resolve Apple TV titles to IMDb IDs and years. Cache and manual-override.
 
-Phase 4 -- Admin delete UI.
+Phase 4 -- Admin delete UI. NEXT.
   Until this ships, deleting means one SQL statement over SSH, which is survivable.
 
 Phase 5 -- Netflix, only if the gap proves annoying.
