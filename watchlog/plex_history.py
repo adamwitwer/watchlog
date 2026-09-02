@@ -37,15 +37,33 @@ def account_id(title):
     return None
 
 
-def _guid_from_metadata(rating_key, cache):
-    """imdb/tmdb ids for a show or film, fetched once per key."""
+def _rating_key(row):
+    """The key to look metadata up by: the series for an episode, the film itself
+    for a movie.
+
+    History rows carry grandparentKey ('/library/metadata/123') but NOT
+    grandparentRatingKey, so the series key has to be parsed out of the path.
+    """
+    if row.get("type") == "episode":
+        parent = row.get("grandparentKey") or ""
+        return parent.rstrip("/").split("/")[-1] or None
+    return row.get("ratingKey")
+
+
+def _metadata(rating_key, cache):
+    """(imdb, tmdb, year) for a show or film, fetched once per key.
+
+    History rows have no year either, so it comes from here as well -- and for
+    an episode that correctly yields the series' year rather than the episode's.
+    """
     if rating_key in cache:
         return cache[rating_key]
 
-    imdb = tmdb = None
+    imdb = tmdb = year = None
     try:
         items = _get(f"/library/metadata/{rating_key}").get("Metadata", [])
         for entry in items[:1]:
+            year = entry.get("year")
             for guid in entry.get("Guid", []):
                 value = guid.get("id", "")
                 if value.startswith("imdb://"):
@@ -55,8 +73,8 @@ def _guid_from_metadata(rating_key, cache):
     except Exception as exc:
         log.warning("metadata fetch failed for %s: %s", rating_key, exc)
 
-    cache[rating_key] = (imdb, tmdb)
-    return imdb, tmdb
+    cache[rating_key] = (imdb, tmdb, year)
+    return imdb, tmdb, year
 
 
 def fetch_history(account=None):
@@ -98,19 +116,16 @@ def to_event(row, cache):
         title = row.get("title") or "Unknown"
         season = episode = None
         episode_title = None
-        # A film's own metadata carries its ids.
-        key = row.get("ratingKey")
     else:
         title = row.get("grandparentTitle") or "Unknown"
         season = row.get("parentIndex")
         episode = row.get("index")
         episode_title = row.get("title")
-        # Link the show, not the individual episode.
-        key = row.get("grandparentRatingKey")
 
-    imdb = tmdb = None
+    imdb = tmdb = year = None
+    key = _rating_key(row)
     if key:
-        imdb, tmdb = _guid_from_metadata(key, cache)
+        imdb, tmdb, year = _metadata(key, cache)
 
     return {
         "watched_at": watched_at,
@@ -119,7 +134,7 @@ def to_event(row, cache):
         "media_type": kind,
         "title": title,
         "episode_title": episode_title,
-        "year": row.get("year"),
+        "year": year,
         "season": season,
         "episode": episode,
         "imdb_id": imdb,
