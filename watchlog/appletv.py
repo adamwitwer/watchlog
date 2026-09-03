@@ -38,15 +38,33 @@ class Tracker:
     def __init__(self):
         self.key = None
         self.logged = False
+        self.peak = 0.0
+        # Diagnostic only, and deliberately not cleared by reset(): one line per
+        # unrecognised app for the life of the process, not one every poll.
+        self.unknown_apps = set()
 
     def reset(self):
+        # A session that ends without being logged is the interesting failure:
+        # it says the title was seen and how close it got, which separates "never
+        # noticed it" from "noticed it, fell short of the threshold".
+        if self.key and not self.logged and self.peak > 0:
+            log.info("stopped: %s at %.0f%% (threshold %.0f%%)",
+                     self.key[1], self.peak * 100, config.WATCHED_THRESHOLD * 100)
         self.key = None
         self.logged = False
+        self.peak = 0.0
 
     def observe(self, app_id, app_name, title, position, total_time, state):
         service = config.APPLETV_APPS.get(app_id)
         if service is None:
             # Not an app we log -- Plex included, since its webhook covers it.
+            # Say so once, though: an app that plays but is missing from the
+            # allowlist is otherwise indistinguishable from one that reports
+            # nothing, and the difference is a one-line fix vs. a dead end.
+            if app_id and app_id not in self.unknown_apps:
+                self.unknown_apps.add(app_id)
+                log.info("ignoring app %s (%s), playing %r -- not in APPLETV_APPS",
+                         app_id, app_name, title)
             self.reset()
             return None
 
@@ -56,14 +74,15 @@ class Tracker:
 
         key = (app_id, title)
         if key != self.key:
+            self.reset()
             self.key = key
-            self.logged = False
             log.info("now playing: %s (%s)", title, app_name)
 
         if self.logged or not total_time or position is None:
             return None
 
         percent = position / total_time
+        self.peak = max(self.peak, percent)
         if percent < config.WATCHED_THRESHOLD:
             return None
 
