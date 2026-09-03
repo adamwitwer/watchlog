@@ -34,6 +34,14 @@ immediately; removed entries can be restored.
 
 **v1 is complete.** Netflix is Phase 5, and only if the gap proves annoying.
 
+**Reconcile — running.** `watchlog-reconcile.timer` re-reads the last week of Plex's own
+history every hour and imports anything the webhook missed. It exists because the webhook
+turned out to have a silent failure mode: PMS asks plex.tv for its hook list *once, at
+startup*, and if that request loses a race with DNS after a reboot it delivers to zero
+hooks until someone restarts it. The reconcile pass writes the same dedup key the webhook
+does, so live-delivered plays are recognised and skipped, and it only republishes when
+something actually landed.
+
 ## How it works
 
 Two sensors feed one SQLite database on a Raspberry Pi, which renders a single static

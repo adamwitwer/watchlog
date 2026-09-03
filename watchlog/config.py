@@ -53,6 +53,12 @@ DEDUP_WINDOW_HOURS = 48
 # history backfill doesn't turn a scannable list into an endless scroll.
 PAGE_LIMIT = 150
 
+# How far back the hourly reconcile pass re-reads Plex's own history. PMS asks
+# plex.tv for its webhook list only at startup; lose that request to a DNS race
+# after a reboot and deliveries stop silently until the next restart. A week is
+# comfortably longer than that goes unnoticed, and costs one page of history.
+RECONCILE_DAYS = 7
+
 PLEX_SERVER_URL = _get("PLEX_SERVER_URL", "")
 
 # Push updates fire only on state change, so position has to be polled.

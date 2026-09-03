@@ -60,6 +60,17 @@ def init():
         conn.executescript(SCHEMA)
 
 
+def is_duplicate(event):
+    """Has an equivalent event already been recorded nearby in time?"""
+    with connect() as conn:
+        return conn.execute(
+            """SELECT id FROM events
+               WHERE dedup_key = ?
+                 AND ABS(julianday(watched_at) - julianday(?)) * 24 < ?""",
+            (event["dedup_key"], event["watched_at"], config.DEDUP_WINDOW_HOURS),
+        ).fetchone() is not None
+
+
 def insert_event(event):
     """Insert unless an equivalent event was already recorded nearby in time.
 

@@ -198,3 +198,12 @@ RISKS AND OPEN QUESTIONS
 
 7. Deliberately not building: a blocklist. I chose instant publish. Worth revisiting
    only if something embarrassing ends up on the page and delete feels too slow.
+
+8. RESOLVED. Plex webhooks fail silently and permanently. PMS fetches its webhook list
+   from servers.plex.tv once at startup; on 2026-09-02 it crashed, restarted at 14:30:43,
+   and three seconds later the fetch lost a race with DNS ("Could not resolve host:
+   servers.plex.tv"). It never retried. Every delivery before that logged "to 1 hooks";
+   after it, no delivery lines at all, and a full evening of viewing went unrecorded with
+   no error anywhere on our side. Fixed by not depending on the webhook for correctness:
+   watchlog-reconcile.timer re-reads the last RECONCILE_DAYS of Plex's own history hourly
+   and imports whatever is missing. The webhook is now just the fast path.

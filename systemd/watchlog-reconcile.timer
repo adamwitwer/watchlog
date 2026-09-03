@@ -1,0 +1,15 @@
+[Unit]
+Description=Hourly Watchlog reconcile against Plex history
+
+[Timer]
+# OnCalendar rather than OnUnitActiveSec: the latter counts from the last run,
+# so a timer enabled long after boot that has never run schedules nothing at all.
+OnCalendar=hourly
+# A Pi reboot and a PMS reboot tend to be the same power cut, and the reboot is
+# exactly when the webhook goes dark -- so don't wait up to an hour to check.
+OnBootSec=5min
+Persistent=true
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target

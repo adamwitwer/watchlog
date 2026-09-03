@@ -1,8 +1,15 @@
-"""Backfill from the Plex server's own watch history.
+"""Import from the Plex server's own watch history.
 
-Plex keeps every play it ever recorded, with real timestamps, so the page can
-start populated instead of empty. History rows are sparse -- no GUIDs -- so the
-IMDb id comes from a second metadata fetch per distinct show or film, cached.
+Two jobs, same machinery. `backfill` walks all of history once so the page can
+start populated instead of empty. `reconcile` re-walks the last few days on a
+timer, and exists because the webhook cannot be trusted to stay alive: PMS
+fetches its hook list from plex.tv exactly once, at startup, and if that request
+loses a race with DNS after a reboot it silently delivers to zero hooks until
+the next restart. History is the server's own record and is never wrong, so a
+periodic pass over it closes any gap without anyone noticing one opened.
+
+History rows are sparse -- no GUIDs -- so the IMDb id comes from a second
+metadata fetch per distinct show or film, cached.
 """
 import logging
 
@@ -77,14 +84,19 @@ def _metadata(rating_key, cache):
     return imdb, tmdb, year
 
 
-def fetch_history(account=None):
-    """Every history row, oldest first, paginated."""
+def fetch_history(account=None, since=None):
+    """History rows, paginated.
+
+    With no `since`, every row oldest-first. With a `since` epoch, newest-first
+    and stopping as soon as the rows get older than the cutoff -- a reconcile
+    pass reads one page, not the whole history.
+    """
     start = 0
     while True:
         params = {
             "X-Plex-Container-Start": start,
             "X-Plex-Container-Size": PAGE_SIZE,
-            "sort": "viewedAt:asc",
+            "sort": "viewedAt:desc" if since else "viewedAt:asc",
         }
         if account is not None:
             params["accountID"] = account
@@ -94,6 +106,8 @@ def fetch_history(account=None):
         if not rows:
             return
         for row in rows:
+            if since and int(row.get("viewedAt") or 0) < since:
+                return
             yield row
         start += len(rows)
         if start >= int(container.get("totalSize", 0)):
@@ -145,24 +159,21 @@ def to_event(row, cache):
     }
 
 
-def backfill(dry_run=False):
-    if not config.PLEX_TOKEN:
-        raise RuntimeError("PLEX_TOKEN is not set in .env")
-
-    db.init()
-    account = account_id(config.PLEX_ACCOUNT_TITLE)
-    log.info("account %r -> id %s", config.PLEX_ACCOUNT_TITLE, account)
-    if account is None:
-        log.warning("account not matched; importing history for ALL users")
-
+def _import(rows, dry_run=False):
+    """Feed history rows through dedup into the db. Returns (seen, inserted, skipped)."""
     cache = {}
     seen = inserted = skipped = 0
-    for row in fetch_history(account):
+    for row in rows:
         seen += 1
         event = to_event(row, cache)
         if event is None:
             continue
+        # A dry run still asks the dedup question, or it reports every row it
+        # reads as new and makes a working reconcile look like a duplicate storm.
         if dry_run:
+            if db.is_duplicate(event):
+                skipped += 1
+                continue
             inserted += 1
             if inserted <= 15:
                 log.info("would import: %s %s S%sE%s (%s)", event["watched_at"][:10],
@@ -172,13 +183,72 @@ def backfill(dry_run=False):
             skipped += 1
         else:
             inserted += 1
+            log.info("imported %s: %s S%sE%s", event["watched_at"][:10],
+                     event["title"], event["season"], event["episode"])
+    return seen, inserted, skipped
 
+
+def _account():
+    if not config.PLEX_TOKEN:
+        raise RuntimeError("PLEX_TOKEN is not set in .env")
+    db.init()
+    account = account_id(config.PLEX_ACCOUNT_TITLE)
+    if account is None:
+        log.warning("account %r not matched; importing history for ALL users",
+                    config.PLEX_ACCOUNT_TITLE)
+    return account
+
+
+def backfill(dry_run=False):
+    account = _account()
+    log.info("account %r -> id %s", config.PLEX_ACCOUNT_TITLE, account)
+    seen, inserted, skipped = _import(fetch_history(account), dry_run=dry_run)
     log.info("history rows seen: %d, imported: %d, duplicates skipped: %d",
              seen, inserted, skipped)
     return inserted
 
 
+def reconcile(days=None, dry_run=False):
+    """Re-read the recent past and import anything the webhook missed.
+
+    Safe to run as often as you like: the dedup key here is byte-identical to
+    the one the webhook writes, so a play that arrived live is recognised and
+    skipped rather than doubled. Only publishes when something actually landed.
+    """
+    import time
+
+    days = days or config.RECONCILE_DAYS
+    account = _account()
+    cutoff = int(time.time()) - days * 86400
+    seen, inserted, skipped = _import(
+        fetch_history(account, since=cutoff), dry_run=dry_run
+    )
+    log.info("reconcile over %d days: %d rows seen, %d imported, %d already known",
+             days, seen, inserted, skipped)
+
+    if inserted and not dry_run:
+        from . import enrich, publish, render
+        try:
+            enrich.enrich_pending()
+        except Exception:
+            log.exception("enrichment failed; publishing anyway")
+        render.write_page()
+        publish.push()
+        log.info("published %d recovered event(s)", inserted)
+
+    return inserted
+
+
 if __name__ == "__main__":
     import sys
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
-    backfill(dry_run="--dry-run" in sys.argv)
+    dry = "--dry-run" in sys.argv
+    if "--reconcile" in sys.argv:
+        days = None
+        for arg in sys.argv:
+            if arg.startswith("--days="):
+                days = int(arg.split("=", 1)[1])
+        reconcile(days=days, dry_run=dry)
+    else:
+        backfill(dry_run=dry)

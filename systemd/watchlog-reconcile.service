@@ -1,0 +1,11 @@
+[Unit]
+Description=Watchlog reconcile against Plex history
+Documentation=https://github.com/adamwitwer/watchlog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=adam
+WorkingDirectory=/home/adam/Projects/watchlog
+ExecStart=/home/adam/Projects/watchlog/venv/bin/python -m watchlog.plex_history --reconcile
