@@ -137,7 +137,8 @@
     episode or episode title — the device doesn't report them — so those can be
     filled in by hand. Netflix and anything else no sensor reaches can be added
     outright — the IMDb link and year are looked up for you.
-    The published page shows the most recent {{ published }} entries —
+    The published page shows
+    {% if published %}the most recent {{ published }} entries{% else %}every entry{% endif %} —
     <a href="https://adamwitwer.com/watchlog/">view it</a>.
   </p>
 

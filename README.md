@@ -42,6 +42,14 @@ them. The admin page accepts season, episode and episode title by hand for any e
 backed by a single event — which is every Apple TV entry, because the device reports
 none of the three.
 
+**The whole log, and a timeline rail — running.** `PAGE_LIMIT` is `None`: the page shows
+every entry, back to where the Plex history starts. It costs little — 232 entries render
+to 135KB, which the host serves as 13KB gzipped, the markup being repetitive enough to
+compress about 10:1. A rail of hairlines down the right edge, one per entry, gives the
+year a texture; hovering expands a tick and labels it, clicking jumps to it, and on touch
+it collapses to a labelled month index. Past `RAIL_MAX_TICKS` the fine ticks thin out, so
+the rail stays legible however long the log gets.
+
 **Manual entry — running.** The admin page can create whole entries, for the platforms
 no sensor reaches — Netflix above all, which reports nothing at all from the Apple TV.
 Pick a date and a service, type a title, and the IMDb id and year are resolved from TMDb

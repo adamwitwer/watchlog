@@ -153,11 +153,14 @@
     display: flex;
     flex-direction: column;
     z-index: 5;
+    /* Deliberately not overflow: hidden. Both labels -- the hover tooltip and
+       the mobile month abbreviations -- sit outside the rail to its left, so
+       clipping the box erases them. Overflow is prevented instead by giving
+       the ticks no minimum height: flex items with no floor always fit. */
   }
 
   .tick {
     flex: 1 1 0;
-    min-height: 2px;
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -282,7 +285,7 @@
   {% endif %}
 
   <nav class="rail" aria-label="Jump to a date">
-    {% for entry in entries %}
+    {% for entry in entries if entry.rail_tick %}
     <a class="tick{% if entry.month_start %} tick--month{% endif %}"
        href="#{{ entry.anchor }}"
        {% if entry.month_start %}data-month="{{ entry.month_short }}"{% else %}tabindex="-1"{% endif %}

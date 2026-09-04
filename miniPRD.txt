@@ -231,3 +231,13 @@ RISKS AND OPEN QUESTIONS
     of Aug 28 and is filed under Aug 29. Fixing it means converting to local time
     before subtracting, and it would re-date some existing entries on the page, so
     it is Adam's call. Manual entries are unaffected: they are anchored at 9pm local.
+
+12. PAGE_LIMIT removed 2026-09-04 -- the page now shows everything. The worry was file
+    size; the measurement said otherwise. 150 entries were 89KB raw and 9.3KB gzipped,
+    and the full 232 are 135KB raw and 13KB gzipped, because a page of near-identical
+    markup compresses about 10:1. Even a decade of viewing stays trivial to serve.
+    The real limit turned out to be the rail, not the file: one hairline per entry into
+    a fixed ~520px column stops being legible somewhere past 300 ticks, so beyond
+    RAIL_MAX_TICKS the fine ticks thin out and only month markers are guaranteed.
+    If thumbnails are ever added this calculus changes completely -- images don't
+    compress the way this markup does, and that would be the thing to measure first.

@@ -49,9 +49,19 @@ WATCHED_THRESHOLD = 0.90
 # artifact is not.
 DEDUP_WINDOW_HOURS = 48
 
-# The database keeps everything. The page shows this many entries, so a full
-# history backfill doesn't turn a scannable list into an endless scroll.
-PAGE_LIMIT = 150
+# The database keeps everything, and so does the page: None means no limit.
+# Weighed against real numbers -- 150 entries render to 89KB, which the host
+# serves as 9.3KB gzipped, because the markup is repetitive enough to compress
+# almost 10:1. Even a decade of viewing stays trivial to serve. Set an integer
+# here to cap it again; `entries[:None]` is the whole list, so nothing else
+# needs to change.
+PAGE_LIMIT = None
+
+# The rail draws one hairline per entry into a fixed column about 650px tall.
+# Past this many, ticks stop being distinguishable and the texture that makes
+# the rail worth having turns into a solid bar -- so beyond it the fine ticks
+# thin out and only every Nth entry gets one. Month markers are always kept.
+RAIL_MAX_TICKS = 300
 
 # How far back the hourly reconcile pass re-reads Plex's own history. PMS asks
 # plex.tv for its webhook list only at startup; lose that request to a DNS race
