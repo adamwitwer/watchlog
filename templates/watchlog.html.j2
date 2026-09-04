@@ -127,6 +127,116 @@
   footer a:hover { color: var(--accent); }
 
   .empty { color: var(--muted); font-size: 1.05rem; }
+
+  /* --- timeline rail -------------------------------------------------------
+     One hairline per entry, newest at the top, so a year of viewing reads as
+     texture: the dense stretches are the busy weeks. Hovering a tick expands it
+     and labels it with its date; clicking jumps to that entry. All of it is
+     plain anchors and CSS -- the page still ships no JavaScript.
+
+     Only the first tick of each month is a tab stop. 150 tab stops before the
+     content would be hostile, and the fine ticks are a pointer affordance for
+     something the list already says in full. */
+  /* Deliberately NOT scroll-behavior: smooth. The page is ~24,000px tall, so
+     animating a jump from September to October scrolls through the whole year --
+     slow, disorienting, and easily interrupted mid-flight, which strands you
+     somewhere arbitrary. A scrubber should land, not travel. */
+  li { scroll-margin-top: clamp(1.5rem, 5vw, 3rem); }
+
+  .rail {
+    position: fixed;
+    top: 50%;
+    right: clamp(0.5rem, 2.5vw, 2.25rem);
+    transform: translateY(-50%);
+    height: min(72vh, 40rem);
+    width: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    z-index: 5;
+  }
+
+  .tick {
+    flex: 1 1 0;
+    min-height: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    position: relative;
+    text-decoration: none;
+  }
+
+  .tick::before {
+    content: "";
+    width: 9px;
+    height: 1.5px;
+    border-radius: 1px;
+    background: var(--rule);
+    transition: width 0.18s ease, background-color 0.18s ease;
+  }
+
+  .tick--month::before { width: 17px; background: var(--muted); }
+
+  .tick:hover::before,
+  .tick:focus-visible::before { width: 30px; background: var(--accent); }
+
+  /* The neighbours lift too, so the rail moves like a wave rather than one
+     tick blinking on and off. */
+  .tick:hover + .tick::before,
+  .tick:has(+ .tick:hover)::before { width: 22px; background: var(--muted); }
+
+  .tick-label {
+    position: absolute;
+    right: calc(100% + 0.5rem);
+    white-space: nowrap;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    padding: 0.2rem 0.45rem;
+    opacity: 0;
+    transform: translateX(0.35rem);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    pointer-events: none;
+  }
+
+  .tick:hover .tick-label,
+  .tick:focus-visible .tick-label,
+  .tick:active .tick-label { opacity: 1; transform: none; }
+
+  /* Where you landed, faintly, so a jump doesn't leave you hunting. */
+  li:target { border-top-color: var(--accent); }
+
+  /* Touch and narrow screens: no hover to reveal a label, and a 4px tick is
+     not a tap target. Drop to one tick per month, spaced out enough to hit,
+     and give the column room so the rail never sits on top of the text. */
+  @media (max-width: 46rem), (hover: none) {
+    .wrap { padding-right: 3.9rem; }
+    .rail { right: 0.5rem; width: 3.1rem; height: min(70vh, 34rem); }
+    .tick:not(.tick--month) { display: none; }
+
+    /* Spread the months over the rail so each is a real tap target rather
+       than a 17px sliver, and label them: with no hover there is nothing
+       else to tell one dash from another. */
+    .tick--month { flex: 1 1 0; min-height: 2.4rem; }
+    .tick--month::before { width: 10px; }
+    .tick--month::after {
+      content: attr(data-month);
+      position: absolute;
+      right: calc(100% + 0.35rem);
+      font-size: 0.56rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .tick-label { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tick::before, .tick-label { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -143,7 +253,7 @@
   {% if entries %}
   <ol>
     {% for entry in entries %}
-    <li>
+    <li id="{{ entry.anchor }}">
       <p class="title">
         {%- if entry.imdb_id %}
         <a href="https://www.imdb.com/title/{{ entry.imdb_id }}/">{{ entry.title }}</a>
@@ -170,6 +280,15 @@
   {% else %}
   <p class="empty">Nothing logged yet.</p>
   {% endif %}
+
+  <nav class="rail" aria-label="Jump to a date">
+    {% for entry in entries %}
+    <a class="tick{% if entry.month_start %} tick--month{% endif %}"
+       href="#{{ entry.anchor }}"
+       {% if entry.month_start %}data-month="{{ entry.month_short }}"{% else %}tabindex="-1"{% endif %}
+       aria-label="{{ entry.date_label }}"><span class="tick-label">{{ entry.date_label }}</span></a>
+    {% endfor %}
+  </nav>
 
   <footer>
     Updated {{ generated_at }} ·

@@ -19,8 +19,21 @@ def _date_label(iso):
 
 def build_html():
     entries = group(db.visible_events())[: config.PAGE_LIMIT]
-    for entry in entries:
+
+    # Everything the timeline rail needs: an anchor to jump to, and a flag on
+    # the first entry of each month. Entries are newest first, so "first of the
+    # month" means the topmost one as you read down.
+    previous_month = None
+    for index, entry in enumerate(entries, start=1):
+        moment = datetime.fromisoformat(
+            entry["watched_at"].replace("Z", "+00:00")
+        ).astimezone()
         entry["date_label"] = _date_label(entry["watched_at"])
+        entry["anchor"] = f"e{index}"
+        month = (moment.year, moment.month)
+        entry["month_start"] = month != previous_month
+        entry["month_short"] = moment.strftime("%b")
+        previous_month = month
 
     env = Environment(
         loader=FileSystemLoader(TEMPLATES),
