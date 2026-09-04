@@ -34,6 +34,14 @@ immediately; removed entries can be restored.
 
 **v1 is complete.** Netflix is Phase 5, and only if the gap proves annoying.
 
+**Episode titles and manual details — running.** The page shows the episode title
+under each entry, for nights of up to `EPISODE_TITLES_MAX` episodes (a long binge keeps
+the range and drops the titles, rather than turning one line into a paragraph). Plex's
+"Episode 4" placeholders are treated as absent, since they only restate the label above
+them. The admin page accepts season, episode and episode title by hand for any entry
+backed by a single event — which is every Apple TV entry, because the device reports
+none of the three.
+
 **Reconcile — running.** `watchlog-reconcile.timer` re-reads the last week of Plex's own
 history every hour and imports anything the webhook missed. It exists because the webhook
 turned out to have a silent failure mode: PMS asks plex.tv for its hook list *once, at

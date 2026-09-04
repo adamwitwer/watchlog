@@ -33,7 +33,7 @@
 
   ul { list-style: none; margin: 0; padding: 0; }
   li {
-    display: flex; align-items: baseline; gap: 0.85rem;
+    display: flex; align-items: baseline; gap: 0.85rem; flex-wrap: wrap;
     padding: 0.7rem 0.85rem; border: 1px solid var(--rule);
     border-radius: 8px; margin-bottom: 0.4rem; background: var(--card);
   }
@@ -56,15 +56,54 @@
   button:hover { border-color: var(--danger); color: var(--danger); }
   .restore button:hover { border-color: var(--accent); color: var(--accent); }
   .empty { color: var(--muted); font-size: 0.9rem; }
+
+  .epname { color: var(--muted); font-size: 0.87rem; margin-top: 0.1rem; }
+
+  /* The edit form is a <details> so it stays collapsed and needs no script. */
+  details.edit { flex-basis: 100%; margin-top: 0.5rem; }
+  details.edit summary {
+    cursor: pointer; font-size: 0.75rem; color: var(--muted);
+    letter-spacing: 0.06em; text-transform: uppercase; list-style: none;
+  }
+  details.edit summary::-webkit-details-marker { display: none; }
+  details.edit summary::before { content: "+ "; }
+  details.edit[open] summary::before { content: "− "; }
+  details.edit summary:hover { color: var(--accent); }
+  .fields {
+    display: flex; flex-wrap: wrap; gap: 0.5rem;
+    align-items: center; margin-top: 0.6rem;
+  }
+  .fields label {
+    font-size: 0.7rem; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .fields input {
+    font: inherit; font-size: 0.85rem; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--rule); border-radius: 6px; padding: 0.3rem 0.5rem;
+  }
+  .fields input:focus { outline: none; border-color: var(--accent); }
+  .fields input.num { width: 4.2rem; }
+  .fields input.name { flex: 1; min-width: 11rem; }
+  .fields button:hover { border-color: var(--accent); color: var(--accent); }
+  .warn {
+    border: 1px solid var(--danger); color: var(--danger); background: var(--card);
+    border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem;
+    margin: 0 0 1.25rem;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <h1>Watchlog admin</h1>
+  {% if error %}
+  <p class="warn">{{ error }} — nothing was changed.</p>
+  {% endif %}
   <p class="note">
     Deleting hides an entry and republishes immediately. Nothing is destroyed, so
-    anything removed can be restored below.
+    anything removed can be restored below. Apple TV entries arrive with no season,
+    episode or episode title — the device doesn't report them — so those can be
+    filled in by hand.
     The published page shows the most recent {{ published }} entries —
     <a href="https://adamwitwer.com/watchlog/">view it</a>.
   </p>
@@ -79,6 +118,9 @@
           {{ entry.title }}
           {%- if entry.detail %} <span class="detail">{{ entry.detail }}</span>{% endif %}
         </div>
+        {% if entry.episode_names %}
+        <div class="epname">{{ entry.episode_names }}</div>
+        {% endif %}
         <div class="meta">
           {{ entry.date_label }} / <span class="badge">{{ entry.service }}</span>
           {%- if entry.ids|length > 1 %}
@@ -90,6 +132,28 @@
         <input type="hidden" name="ids" value="{{ entry.id_list }}">
         <button type="submit">Delete</button>
       </form>
+      {% if entry.editable %}
+      <details class="edit">
+        <summary>Edit episode details</summary>
+        <form method="post" action="{{ url_for('edit') }}">
+          <input type="hidden" name="id" value="{{ entry.editable['id'] }}">
+          <div class="fields">
+            <label for="s{{ entry.editable['id'] }}">Season</label>
+            <input class="num" type="number" min="0" step="1" inputmode="numeric"
+                   id="s{{ entry.editable['id'] }}" name="season"
+                   value="{{ entry.editable['season'] if entry.editable['season'] is not none }}">
+            <label for="e{{ entry.editable['id'] }}">Ep</label>
+            <input class="num" type="number" min="0" step="1" inputmode="numeric"
+                   id="e{{ entry.editable['id'] }}" name="episode"
+                   value="{{ entry.editable['episode'] if entry.editable['episode'] is not none }}">
+            <input class="name" type="text" name="episode_title" maxlength="200"
+                   placeholder="Episode title"
+                   value="{{ entry.editable['episode_title'] or '' }}">
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </details>
+      {% endif %}
     </li>
     {% endfor %}
   </ul>

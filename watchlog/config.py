@@ -59,6 +59,11 @@ PAGE_LIMIT = 150
 # comfortably longer than that goes unnoticed, and costs one page of history.
 RECONCILE_DAYS = 7
 
+# Episode titles are listed for a night up to this many episodes, then withheld
+# so a long binge doesn't turn one scannable line into a paragraph. Measured
+# against real data: 229 of 231 entries are three episodes or fewer.
+EPISODE_TITLES_MAX = 3
+
 PLEX_SERVER_URL = _get("PLEX_SERVER_URL", "")
 
 # Push updates fire only on state change, so position has to be polled.

@@ -207,3 +207,12 @@ RISKS AND OPEN QUESTIONS
    no error anywhere on our side. Fixed by not depending on the webhook for correctness:
    watchlog-reconcile.timer re-reads the last RECONCILE_DAYS of Plex's own history hourly
    and imports whatever is missing. The webhook is now just the fast path.
+
+9. Episode titles added to the page 2026-09-04, and manual entry of season, episode
+   and episode title added to the admin page. The second is a deliberate departure
+   from "fully automated": the Apple TV reports a series name and nothing else, so
+   typing is the only route to parity with the Plex entries. The original constraint
+   was that nothing should stand between watching and publishing -- no confirmation
+   step -- and an optional after-the-fact edit does not reintroduce one. The page's
+   "Nothing here was typed by hand" line was removed at the same time, because it
+   stops being true the moment the feature is used.

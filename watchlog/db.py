@@ -110,6 +110,23 @@ def recent_events(limit=50):
         ).fetchall()
 
 
+def update_details(event_id, season, episode, episode_title):
+    """Set the fields a sensor couldn't supply.
+
+    Only ever called from the admin form. The enricher writes imdb_id, tmdb_id
+    and year and never these three, so a hand-typed correction is not at risk of
+    being overwritten later. dedup_key is left alone too -- it is what stops the
+    same night being recorded twice, and rewriting it here would break that.
+    """
+    with connect() as conn:
+        conn.execute(
+            """UPDATE events
+                  SET season = ?, episode = ?, episode_title = ?
+                WHERE id = ?""",
+            (season, episode, episode_title, event_id),
+        )
+
+
 def set_hidden(event_ids, hidden=True):
     with connect() as conn:
         conn.executemany(

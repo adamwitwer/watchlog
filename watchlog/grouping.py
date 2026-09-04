@@ -7,7 +7,7 @@ bingeing buries everything else on a page built around large type.
 import re
 from datetime import datetime, timedelta
 
-from .config import NIGHT_ROLLOVER_HOUR
+from .config import EPISODE_TITLES_MAX, NIGHT_ROLLOVER_HOUR
 
 
 def normalize(title):
@@ -60,6 +60,35 @@ def episode_label(rows):
     return format_episodes(episodes)
 
 
+# Plex stores "Episode 4" when it has no real title for an episode. Printing it
+# under "S1 E3-E4" says nothing the label above hasn't already said. Named
+# conventions like "Chapter 5" are left alone -- those are real titles.
+PLACEHOLDER_TITLE = re.compile(r"^episode\s+\d+$", re.IGNORECASE)
+
+
+def episode_names(rows, limit=EPISODE_TITLES_MAX):
+    """The episode titles for one night, in episode order, or None.
+
+    Withheld once a night runs past `limit` episodes: the page is built around
+    one scannable line per entry, and six titles turns that line into a
+    paragraph. The E-range still says what was watched.
+
+    Apple TV entries have no episode title unless one was typed in by hand, so
+    most of them return None here until they are edited.
+    """
+    named = [r for r in rows
+             if (r["episode_title"] or "").strip()
+             and not PLACEHOLDER_TITLE.match(r["episode_title"].strip())]
+    if not named or len(named) > limit:
+        return None
+
+    ordered = sorted(
+        named,
+        key=lambda r: (r["episode"] is None, r["episode"] or 0, r["watched_at"]),
+    )
+    return " \u00b7 ".join(r["episode_title"].strip() for r in ordered)
+
+
 def group(rows):
     """Rows (newest first) -> display entries (newest first)."""
     entries = []
@@ -72,6 +101,7 @@ def group(rows):
                 "watched_at": row["watched_at"],
                 "title": row["title"],
                 "detail": None,
+                "episode_names": None,
                 "year": row["year"],
                 "service": row["service"],
                 "imdb_id": row["imdb_id"],
@@ -89,6 +119,7 @@ def group(rows):
             "watched_at": newest["watched_at"],
             "title": newest["title"],
             "detail": episode_label(rows_in_bucket),
+            "episode_names": episode_names(rows_in_bucket),
             "year": newest["year"],
             "service": newest["service"],
             "imdb_id": next((r["imdb_id"] for r in rows_in_bucket if r["imdb_id"]), None),

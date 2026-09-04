@@ -94,6 +94,13 @@
     letter-spacing: 0;
   }
 
+  .epname {
+    font-size: clamp(0.95rem, 2.6vw, 1.08rem);
+    color: var(--muted);
+    margin: 0.3rem 0 0;
+    line-height: 1.35;
+  }
+
   .meta {
     margin-top: 0.55rem;
     font-size: 0.76rem;
@@ -130,7 +137,6 @@
     <p class="blurb">
       What I've been watching, logged automatically from
       <a href="https://www.plex.tv">Plex</a> and the Apple TV.
-      Nothing here was typed by hand.
     </p>
   </header>
 
@@ -146,6 +152,9 @@
         {%- endif %}
         {%- if entry.detail %} <span class="detail">{{ entry.detail }}</span>{% endif %}
       </p>
+      {% if entry.episode_names %}
+      <p class="epname">{{ entry.episode_names }}</p>
+      {% endif %}
       <p class="meta">
         <span>{{ entry.date_label }}</span>
         <span class="sep">/</span>
