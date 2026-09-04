@@ -64,6 +64,14 @@ RECONCILE_DAYS = 7
 # against real data: 229 of 231 entries are three episodes or fewer.
 EPISODE_TITLES_MAX = 3
 
+# Suggestions for the admin's "add an entry" service field, not a restriction --
+# the field is free text. These are the platforms no sensor can reach: Netflix
+# reports nothing from the Apple TV, and the rest were never wired up at all.
+MANUAL_SERVICES = [
+    "Netflix", "Prime Video", "Disney+", "Max", "Hulu",
+    "Paramount+", "Peacock", "YouTube", "Theater",
+]
+
 PLEX_SERVER_URL = _get("PLEX_SERVER_URL", "")
 
 # Push updates fire only on state change, so position has to be polled.

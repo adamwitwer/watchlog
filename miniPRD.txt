@@ -216,3 +216,18 @@ RISKS AND OPEN QUESTIONS
    step -- and an optional after-the-fact edit does not reintroduce one. The page's
    "Nothing here was typed by hand" line was removed at the same time, because it
    stops being true the moment the feature is used.
+
+10. Manual entry of whole entries added 2026-09-04, closing the Netflix gap by hand
+    rather than by scraping. Phase 5 (scraping netflix.com/viewingactivity with a
+    saved session) stays unbuilt and is now much less likely to be worth it: the
+    scraper was always the single most fragile thing in the design, and a typed
+    entry costs about fifteen seconds.
+
+11. OPEN. The 4am night rollover doesn't actually roll over at 4am local. night_of()
+    subtracts NIGHT_ROLLOVER_HOUR from the UTC clock, so in EDT (UTC-4) the boundary
+    lands at local midnight -- anything watched between midnight and 4am files under
+    the following day, which is exactly the case the rollover was meant to catch.
+    Real example: "Batman: Knightfall" watched 00:13 on Aug 29 belongs to the night
+    of Aug 28 and is filed under Aug 29. Fixing it means converting to local time
+    before subtracting, and it would re-date some existing entries on the page, so
+    it is Adam's call. Manual entries are unaffected: they are anchored at 9pm local.

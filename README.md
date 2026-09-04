@@ -42,6 +42,13 @@ them. The admin page accepts season, episode and episode title by hand for any e
 backed by a single event — which is every Apple TV entry, because the device reports
 none of the three.
 
+**Manual entry — running.** The admin page can create whole entries, for the platforms
+no sensor reaches — Netflix above all, which reports nothing at all from the Apple TV.
+Pick a date and a service, type a title, and the IMDb id and year are resolved from TMDb
+the same way an Apple TV entry's are. Entries are stored with `source = manual` and the
+same dedup key shape the sensors write, so a typed entry and a scrobble for the same
+episode still recognise each other.
+
 **Reconcile — running.** `watchlog-reconcile.timer` re-reads the last week of Plex's own
 history every hour and imports anything the webhook missed. It exists because the webhook
 turned out to have a silent failure mode: PMS asks plex.tv for its hook list *once, at

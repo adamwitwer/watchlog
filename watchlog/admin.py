@@ -11,15 +11,22 @@ It also accepts season, episode and episode title by hand, because the Apple TV
 reports none of them: the device gives a series name and nothing else. Typing is
 the only way those entries get to parity with the Plex ones, and it is offered
 only for entries backed by a single event, which every Apple TV entry is.
+
+And it accepts whole entries by hand, for the platforms no sensor reaches --
+Netflix above all, which reports nothing at all from the Apple TV. This is a
+departure from "logged automatically", but not from the rule that mattered:
+nothing stands between watching and publishing, and an entry typed after the
+fact adds no confirmation step to the automatic path.
 """
 import hmac
 import logging
+from datetime import datetime, time, timezone
 
 from flask import (Flask, make_response, redirect, render_template,
                    request, url_for)
 
-from . import config, db, publish, render
-from .grouping import group
+from . import config, db, enrich, publish, render
+from .grouping import group, normalize
 
 log = logging.getLogger("watchlog.admin")
 app = Flask(__name__, template_folder=str(config.ROOT / "templates"))
@@ -35,7 +42,6 @@ def _authorised():
 
 
 def _date_label(iso):
-    from datetime import datetime
     moment = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone()
     return f"{moment.strftime('%b')} {moment.day}, {moment.year}"
 
@@ -65,7 +71,10 @@ def index():
     response = make_response(
         render_template("admin.html.j2", visible=visible, hidden=hidden,
                         published=config.PAGE_LIMIT,
-                        error=request.args.get("error"))
+                        services=config.MANUAL_SERVICES,
+                        today=datetime.now().astimezone().date().isoformat(),
+                        error=request.args.get("error"),
+                        notice=request.args.get("notice"))
     )
     # Accept the token once in the URL, then keep it in a cookie so the page
     # can be bookmarked without the secret sitting in browser history.
@@ -141,6 +150,88 @@ def edit():
     log.info("edited event %s: S%s E%s %r", event_id, season, episode, episode_title)
     _republish()
     return redirect(url_for("index"))
+
+
+# Manual entries are anchored at 9pm local on the chosen date. Any evening hour
+# would do; what matters is landing unambiguously inside that date's night, clear
+# of both midnight and the 4am rollover, so the entry files under the day typed in.
+MANUAL_HOUR = 21
+
+
+def _watched_at(date_text):
+    """A chosen calendar date -> the UTC timestamp of that night."""
+    try:
+        day = datetime.strptime(date_text.strip(), "%Y-%m-%d").date()
+    except (ValueError, AttributeError):
+        raise _BadField("date must be a real date")
+    local = datetime.combine(day, time(MANUAL_HOUR)).astimezone()
+    return local.astimezone(timezone.utc).isoformat()
+
+
+@app.post("/add")
+def add():
+    if not _authorised():
+        return "Not found", 404
+
+    try:
+        title = (request.form.get("title") or "").strip()[:200]
+        if not title:
+            raise _BadField("a title is required")
+        service = (request.form.get("service") or "").strip()[:40]
+        if not service:
+            raise _BadField("a service is required")
+
+        watched_at = _watched_at(request.form.get("date"))
+        kind = "movie" if request.form.get("media_type") == "movie" else "episode"
+        season = _optional_int("season")
+        episode = _optional_int("episode")
+        year = _optional_int("year")
+    except _BadField as exc:
+        log.warning("rejected new entry: %s", exc)
+        return redirect(url_for("index", error=str(exc)))
+
+    episode_title = (request.form.get("episode_title") or "").strip()[:200] or None
+    if kind == "movie":
+        # Seasons and episode titles belong to episodes; drop them rather than
+        # storing fields that would render as nonsense on a film.
+        season = episode = None
+        episode_title = None
+
+    event = {
+        "watched_at": watched_at,
+        "source": "manual",
+        "service": service,
+        "media_type": kind,
+        "title": title,
+        "episode_title": episode_title,
+        "year": year,
+        "season": season,
+        "episode": episode,
+        "imdb_id": None,
+        "tmdb_id": None,
+        # The same shape the sensors write, so a hand-typed entry and a
+        # scrobble for the same episode still recognise each other.
+        "dedup_key": f"{normalize(title)}|{kind}|{season}|{episode}",
+        "hidden": 0,
+        "raw": None,
+    }
+
+    if db.insert_event(event) is None:
+        # Refusing silently would look like the form did nothing.
+        log.info("duplicate manual entry ignored: %s", event["dedup_key"])
+        return redirect(url_for(
+            "index",
+            error=f"{title} is already logged within "
+                  f"{config.DEDUP_WINDOW_HOURS} hours of that date",
+        ))
+
+    log.info("added %s: %s (%s) on %s", kind, title, service, watched_at[:10])
+    try:
+        enrich.enrich_pending()
+    except Exception:
+        log.exception("enrichment failed; publishing anyway")
+    _republish()
+    return redirect(url_for("index", notice=f"Added {title}."))
 
 
 def main():

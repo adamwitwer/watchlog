@@ -85,6 +85,35 @@
   .fields input.num { width: 4.2rem; }
   .fields input.name { flex: 1; min-width: 11rem; }
   .fields button:hover { border-color: var(--accent); color: var(--accent); }
+  details.add {
+    border: 1px solid var(--rule); border-radius: 8px; background: var(--card);
+    padding: 0.7rem 0.85rem; margin-bottom: 1.75rem;
+  }
+  details.add summary {
+    cursor: pointer; font-size: 0.75rem; color: var(--muted);
+    letter-spacing: 0.06em; text-transform: uppercase; list-style: none;
+  }
+  details.add summary::-webkit-details-marker { display: none; }
+  details.add summary::before { content: "+ "; }
+  details.add[open] summary::before { content: "− "; }
+  details.add summary:hover { color: var(--accent); }
+  /* .fields is display:flex for the inline edit form; here the rows should
+     stack full-width instead, so the title field has room to grow. */
+  details.add .fields { display: block; margin-top: 0.85rem; }
+  details.add .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  details.add .row + .row { margin-top: 0.5rem; }
+  .fields select {
+    font: inherit; font-size: 0.85rem; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--rule); border-radius: 6px; padding: 0.3rem 0.5rem;
+  }
+  .fields input.date { width: 10rem; }
+  .fields input.svc { width: 9rem; }
+  .fields input.wide { flex: 1; min-width: 12rem; }
+  .ok {
+    border: 1px solid var(--accent); color: var(--accent); background: var(--card);
+    border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem;
+    margin: 0 0 1.25rem;
+  }
   .warn {
     border: 1px solid var(--danger); color: var(--danger); background: var(--card);
     border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem;
@@ -99,14 +128,56 @@
   {% if error %}
   <p class="warn">{{ error }} — nothing was changed.</p>
   {% endif %}
+  {% if notice %}
+  <p class="ok">{{ notice }}</p>
+  {% endif %}
   <p class="note">
     Deleting hides an entry and republishes immediately. Nothing is destroyed, so
     anything removed can be restored below. Apple TV entries arrive with no season,
     episode or episode title — the device doesn't report them — so those can be
-    filled in by hand.
+    filled in by hand. Netflix and anything else no sensor reaches can be added
+    outright — the IMDb link and year are looked up for you.
     The published page shows the most recent {{ published }} entries —
     <a href="https://adamwitwer.com/watchlog/">view it</a>.
   </p>
+
+  <details class="add">
+    <summary>Add an entry by hand</summary>
+    <form method="post" action="{{ url_for('add') }}">
+      <div class="fields">
+        <div class="row">
+          <label for="add-date">Watched</label>
+          <input class="date" type="date" id="add-date" name="date"
+                 value="{{ today }}" required>
+          <label for="add-service">On</label>
+          <input class="svc" type="text" id="add-service" name="service"
+                 list="services" placeholder="Netflix" maxlength="40" required>
+          <datalist id="services">
+            {% for s in services %}<option value="{{ s }}">{% endfor %}
+          </datalist>
+          <select name="media_type" aria-label="Type">
+            <option value="episode">Episode</option>
+            <option value="movie">Movie</option>
+          </select>
+        </div>
+        <div class="row">
+          <input class="wide" type="text" name="title" maxlength="200" required
+                 placeholder="Title — the series name, or the film">
+          <input class="num" type="number" min="0" step="1" name="year"
+                 placeholder="Year">
+        </div>
+        <div class="row">
+          <label>Season</label>
+          <input class="num" type="number" min="0" step="1" name="season">
+          <label>Ep</label>
+          <input class="num" type="number" min="0" step="1" name="episode">
+          <input class="wide" type="text" name="episode_title" maxlength="200"
+                 placeholder="Episode title (optional)">
+          <button type="submit">Add</button>
+        </div>
+      </div>
+    </form>
+  </details>
 
   <h2>Published — {{ visible|length }} entries</h2>
   {% if visible %}
