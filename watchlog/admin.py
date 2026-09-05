@@ -20,6 +20,7 @@ fact adds no confirmation step to the automatic path.
 """
 import hmac
 import logging
+import re
 from datetime import datetime, time, timezone
 
 from flask import (Flask, make_response, redirect, render_template,
@@ -61,45 +62,117 @@ def _ago(iso):
     return f"{hours // 24} days ago"
 
 
+def _at(iso):
+    return datetime.fromisoformat(iso)
+
+
 def _beat(label, key, stale_after_seconds, cadence, error_key=None,
           error_at_key=None):
     """One line of 'is this thing actually running'.
 
-    Both sensors are silent when healthy and idle, so silence proves nothing.
-    A heartbeat that has stopped being refreshed is the only difference between
-    working and wedged, and stale counts as broken.
+    There are two ways to be broken and they are not the same thing. A
+    heartbeat that has stopped being refreshed means wedged -- that is the age
+    check, and it only applies to something with a cadence to miss. An attempt
+    that raised means failing, whatever the age. Age alone was not enough:
+    reconcile could error at 10:00, still be holding a 09:00 success, and read
+    green for another hour.
+
+    Pass stale_after_seconds=None for something that runs only when there is
+    something to do, where a long silence is not evidence of anything.
     """
     ok_at = db.get_meta(key)
-    error = db.get_meta(error_key) if error_key else None
+    error = (db.get_meta(error_key) if error_key else None) or None
     error_at = db.get_meta(error_at_key) if error_at_key else None
 
-    if not ok_at:
-        return {"label": label, "state": "unknown",
-                "text": f"{label} has not reported yet.", "error": error or None,
-                "error_ago": None}
+    failed = bool(error and error_at
+                  and (not ok_at or _at(error_at) > _at(ok_at)))
+    stale = bool(
+        stale_after_seconds and ok_at
+        and (datetime.now(timezone.utc) - _at(ok_at)).total_seconds()
+        > stale_after_seconds
+    )
+    broken = failed or stale
 
-    age = (datetime.now(timezone.utc) - datetime.fromisoformat(ok_at)).total_seconds()
-    stale = age > stale_after_seconds
-    text = f"{label} {_ago(ok_at)}"
-    if stale:
-        text += f" — {cadence}, so something is wrong"
+    if not ok_at and not failed:
+        return {"label": label, "state": "unknown",
+                "text": f"{label} has not reported yet.",
+                "error": None, "error_ago": None}
+
+    if failed:
+        # Both can be true at once. Which run failed is the more useful
+        # headline; that it has also stopped keeping up is worth the extra
+        # clause rather than a second line.
+        text = f"{label} failed {_ago(error_at)}"
+        if stale:
+            text += f" — {cadence}, so something is wrong"
+    elif stale:
+        text = f"{label} {_ago(ok_at)} — {cadence}, so something is wrong"
+    else:
+        text = f"{label} {_ago(ok_at)}"
+
     return {
         "label": label,
-        "state": "stale" if stale else "ok",
+        "state": "stale" if broken else "ok",
         "text": text,
         # Only worth showing while it is still the current story.
-        "error": (error or None) if stale else None,
-        "error_ago": _ago(error_at) if error and error_at and stale else None,
+        "error": error if broken else None,
+        "error_ago": _ago(error_at) if (broken and error and error_at) else None,
     }
 
 
+def _webhook_beat():
+    """The Plex webhook, measured by what reconcile has had to clean up after.
+
+    Age proves nothing here: a week without a delivery is a week of not
+    watching anything on Plex. And since reconcile backfills whatever the
+    webhook drops, a dead webhook now has no visible consequence either --
+    which is worse than the original bug, because the log stays correct while
+    the live sensor rots.
+
+    What does prove something is reconcile finding plays at all. Every row it
+    recovers is one the webhook should have delivered and didn't, so a recovery
+    more recent than the last live delivery means the webhook is not working
+    now. A delivery after the last recovery means it came back.
+    """
+    label = "Plex webhook"
+    ok_at = db.get_meta(config.META_WEBHOOK_OK)
+    missed_at = db.get_meta(config.META_WEBHOOK_MISSED_AT)
+    missed = db.get_meta(config.META_WEBHOOK_MISSED)
+
+    if not ok_at and not missed_at:
+        return {"label": label, "state": "unknown",
+                "text": f"{label} has not delivered yet.",
+                "error": None, "error_ago": None}
+
+    if missed_at and (not ok_at or _at(missed_at) > _at(ok_at)):
+        plays = f"{missed} play{'' if missed == '1' else 's'}" if missed else "plays"
+        return {
+            "label": label, "state": "stale",
+            "text": f"{label} — reconcile recovered {plays} {_ago(missed_at)} "
+                    f"that it should have delivered",
+            "error": (f"Last live delivery {_ago(ok_at)}." if ok_at
+                      else "It has never delivered."),
+            "error_ago": None,
+        }
+
+    return {"label": label, "state": "ok",
+            "text": f"{label} delivered {_ago(ok_at)}",
+            "error": None, "error_ago": None}
+
+
 def _health():
+    """The chain, in order: both sensors, the safety net, the way out."""
     return [
+        _webhook_beat(),
+        _beat("Apple TV listener polled", config.META_APPLETV_OK,
+              config.APPLETV_STALE_AFTER_MINUTES * 60, "it polls constantly"),
         _beat("Last reconcile", config.META_RECONCILE_OK,
               config.RECONCILE_STALE_AFTER_HOURS * 3600, "it runs hourly",
               config.META_RECONCILE_ERROR, config.META_RECONCILE_ERROR_AT),
-        _beat("Apple TV listener polled", config.META_APPLETV_OK,
-              config.APPLETV_STALE_AFTER_MINUTES * 60, "it polls constantly"),
+        # No cadence: publishing happens when something changes, so a quiet
+        # week is not a fault. Only a failed attempt is.
+        _beat("Last publish", config.META_PUBLISH_OK, None, None,
+              config.META_PUBLISH_ERROR, config.META_PUBLISH_ERROR_AT),
     ]
 
 
@@ -208,6 +281,59 @@ def edit():
     log.info("edited event %s: S%s E%s %r", event_id, season, episode, episode_title)
     _republish()
     return redirect(url_for("index"))
+
+
+# tt plus seven digits, or eight for anything numbered since about 2020.
+IMDB_ID = re.compile(r"^tt\d{7,8}$")
+
+
+@app.post("/match")
+def match():
+    """Correct what a title resolved to.
+
+    TMDb search is taken in popularity order and is usually right, but "Dark
+    Matter" is a 2024 Apple TV+ series and a 2015 Syfy one, and when it picks
+    wrong the result is a wrong IMDb link on a public page with no way to fix
+    it. This is that way.
+
+    The correction is against the title, not the entry: one show resolves once
+    and every entry for it carries the answer, so fixing it from any one of
+    them fixes all of them.
+    """
+    if not _authorised():
+        return "Not found", 404
+
+    try:
+        title = (request.form.get("title") or "").strip()
+        if not title:
+            raise _BadField("which title?")
+        imdb = (request.form.get("imdb_id") or "").strip().lower() or None
+        if imdb and not IMDB_ID.match(imdb):
+            raise _BadField("an IMDb id looks like tt0903747")
+        year = _optional_int("year")
+    except _BadField as exc:
+        log.warning("rejected match fix: %s", exc)
+        return redirect(url_for("index", error=str(exc)))
+
+    key = normalize(title)
+    # Sources spell the same show differently often enough to matter, and the
+    # enricher's cache is keyed on the normalised form -- so correct every
+    # spelling that shares the key, not just the one that was clicked.
+    titles = [t for t in db.event_titles() if normalize(t) == key]
+
+    # tmdb_id is dropped rather than kept: it was resolved alongside the IMDb
+    # id that just turned out to be wrong, so it points at the same wrong show.
+    db.set_title_match(key, imdb, None, year)
+    changed = db.update_identity(titles, imdb, None, year)
+
+    log.info("match for %r pinned to %s (%s), %d event(s) updated",
+             title, imdb or "nothing", year, changed)
+    _republish()
+    return redirect(url_for(
+        "index",
+        notice=f"{title} now points at {imdb or 'no IMDb entry'}"
+               f" — {changed} entr{'y' if changed == 1 else 'ies'} updated.",
+    ))
 
 
 # Manual entries are anchored at 9pm local on the chosen date. Any evening hour

@@ -81,6 +81,25 @@ META_RECONCILE_ERROR = "reconcile_error"
 META_RECONCILE_ERROR_AT = "reconcile_error_at"
 META_APPLETV_OK = "appletv_ok_at"
 
+# Publishing is the last link in the chain and had no heartbeat: if the rsync to
+# the web host started failing, everything on the Pi would still look perfect
+# while the live page quietly went stale. Two of its three callers swallow the
+# exception, so the record is written inside push() where every caller is
+# covered. Age means nothing here -- no publish for three days is just three
+# days of not watching anything -- so this line goes red on a failed attempt,
+# never on silence.
+META_PUBLISH_OK = "publish_ok_at"
+META_PUBLISH_ERROR = "publish_error"
+META_PUBLISH_ERROR_AT = "publish_error_at"
+
+# The webhook is now covered by reconcile, which means it can die without any
+# visible consequence at all -- the safety net just backfills it forever. The
+# signal that it is rotting is reconcile having to recover anything: a play that
+# the hourly pass finds is by definition a play the webhook did not deliver.
+META_WEBHOOK_OK = "webhook_ok_at"
+META_WEBHOOK_MISSED_AT = "webhook_missed_at"
+META_WEBHOOK_MISSED = "webhook_missed_count"
+
 # Episode titles are listed for a night up to this many episodes, then withheld
 # so a long binge doesn't turn one scannable line into a paragraph. Measured
 # against real data: 229 of 231 entries are three episodes or fewer.

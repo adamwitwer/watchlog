@@ -5,13 +5,45 @@ is one flat HTML file.
 """
 import logging
 import subprocess
+from datetime import datetime, timezone
 
-from . import config
+from . import config, db
 
 log = logging.getLogger("watchlog.publish")
 
 
+def _record(key, value):
+    """Bookkeeping must never be the reason a publish fails."""
+    try:
+        db.set_meta(key, value)
+    except Exception:
+        log.exception("could not record publish outcome")
+
+
 def push(local_path=None):
+    """Publish, and leave a record either way.
+
+    The record lives here rather than in the callers because two of the three
+    -- the webhook's debounced timer and the admin's republish -- catch the
+    exception and carry on. From outside, a web host that has stopped accepting
+    the file looks exactly like one that is up to date.
+    """
+    try:
+        result = _push(local_path)
+    except Exception as exc:
+        _record(config.META_PUBLISH_ERROR, f"{type(exc).__name__}: {exc}"[:400])
+        _record(config.META_PUBLISH_ERROR_AT, _now())
+        raise
+    _record(config.META_PUBLISH_OK, _now())
+    _record(config.META_PUBLISH_ERROR, "")
+    return result
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _push(local_path=None):
     local = local_path or config.OUT_PATH
     if not local.exists():
         raise FileNotFoundError(f"nothing rendered at {local}")

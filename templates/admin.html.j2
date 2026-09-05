@@ -106,6 +106,15 @@
     font: inherit; font-size: 0.85rem; background: var(--bg); color: var(--fg);
     border: 1px solid var(--rule); border-radius: 6px; padding: 0.3rem 0.5rem;
   }
+  .fields input.imdbid { width: 8.5rem; font-variant-numeric: tabular-nums; }
+  .fields .hint {
+    flex-basis: 100%; font-size: 0.72rem; color: var(--muted);
+    letter-spacing: 0;
+  }
+  /* .meta uppercases everything in it, and an IMDb id is lowercase. */
+  .imdb { color: var(--muted); text-transform: none; letter-spacing: 0; }
+  .imdb:hover { color: var(--accent); }
+  .nomatch { color: var(--danger); opacity: 0.75; }
   .fields input.date { width: 10rem; }
   .fields input.svc { width: 9rem; }
   .fields input.wide { flex: 1; min-width: 12rem; }
@@ -149,7 +158,9 @@
     anything removed can be restored below. Apple TV entries arrive with no season,
     episode or episode title — the device doesn't report them — so those can be
     filled in by hand. Netflix and anything else no sensor reaches can be added
-    outright — the IMDb link and year are looked up for you.
+    outright — the IMDb link and year are looked up for you. That lookup takes
+    TMDb's most popular match, which is occasionally the wrong show; where it is,
+    the match can be corrected by hand and is then pinned against further lookups.
     The published page shows
     {% if published %}the most recent {{ published }} entries{% else %}every entry{% endif %} —
     <a href="https://adamwitwer.com/watchlog/">view it</a>.
@@ -199,7 +210,10 @@
     <span>
       {{ beat.text }}
       {% if beat.error %}
-      <span class="detail">Last error {{ beat.error_ago }}: {{ beat.error }}</span>
+      <span class="detail">
+        {%- if beat.error_ago %}Last error {{ beat.error_ago }}: {% endif -%}
+        {{ beat.error }}
+      </span>
       {% endif %}
     </span>
   </p>
@@ -222,6 +236,15 @@
           {{ entry.date_label }} / <span class="badge">{{ entry.service }}</span>
           {%- if entry.ids|length > 1 %}
           / <span class="count">{{ entry.ids|length }} events</span>
+          {%- endif %}
+          {#- What it resolved to, so a wrong match is visible from here rather
+              than only on the public page. #}
+          /
+          {%- if entry.imdb_id %}
+          <a class="imdb" href="https://www.imdb.com/title/{{ entry.imdb_id }}/"
+             target="_blank" rel="noopener">{{ entry.imdb_id }}</a>
+          {%- else %}
+          <span class="nomatch">no IMDb match</span>
           {%- endif %}
         </div>
       </div>
@@ -251,6 +274,27 @@
         </form>
       </details>
       {% endif %}
+      <details class="edit">
+        <summary>Fix the IMDb match</summary>
+        <form method="post" action="{{ url_for('match') }}">
+          <input type="hidden" name="title" value="{{ entry.title }}">
+          <div class="fields">
+            <label for="m{{ loop.index }}">IMDb</label>
+            <input class="imdbid" type="text" id="m{{ loop.index }}" name="imdb_id"
+                   placeholder="tt0903747" maxlength="12" pattern="tt[0-9]{7,8}"
+                   value="{{ entry.imdb_id or '' }}">
+            <label for="y{{ loop.index }}">Year</label>
+            <input class="num" type="number" min="0" step="1"
+                   id="y{{ loop.index }}" name="year"
+                   value="{{ entry.year if entry.year is not none }}">
+            <button type="submit">Save</button>
+            <span class="hint">
+              Applies to every {{ entry.title }} entry, and pins it so the
+              lookup won't overwrite it. Leave the id blank to remove the link.
+            </span>
+          </div>
+        </form>
+      </details>
     </li>
     {% endfor %}
   </ul>

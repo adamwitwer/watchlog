@@ -125,6 +125,14 @@ def plex_hook(secret):
         return "", 204
 
     log.info("recorded %s: %s", event["media_type"], event["title"])
+    # Proof of life. Nothing else can supply it: this listener is silent when
+    # healthy, and reconcile now backfills whatever it drops, so a webhook that
+    # died would otherwise have no visible consequence at all.
+    try:
+        db.set_meta(config.META_WEBHOOK_OK,
+                    datetime.now(timezone.utc).isoformat())
+    except Exception:
+        log.exception("could not record webhook delivery")
     schedule_publish()
     return "", 204
 

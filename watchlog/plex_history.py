@@ -257,6 +257,12 @@ def _reconcile(days=None, dry_run=False):
              days, seen, inserted, skipped)
 
     if inserted and not dry_run:
+        # Every row recovered here is a play the webhook should have delivered
+        # and didn't. That count, not silence, is the measure of whether the
+        # webhook is still doing its job.
+        db.set_meta(config.META_WEBHOOK_MISSED, str(inserted))
+        db.set_meta(config.META_WEBHOOK_MISSED_AT, _now())
+
         from . import enrich, publish, render
         try:
             enrich.enrich_pending()

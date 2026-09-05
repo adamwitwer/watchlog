@@ -316,3 +316,46 @@ RISKS AND OPEN QUESTIONS
     This is the first JavaScript on the public page. The box ships hidden and the script
     reveals it, so no-JS sees no dead input, and the rail and anchors still work without
     it. If more script ever lands here, that is the shape to keep.
+
+18. Closed the last two silent-failure gaps, and found a third while doing it.
+
+    - PUBLISHING had no heartbeat. push() has three callers and two of them -- the
+      webhook's debounced timer and the admin's republish -- catch the exception and
+      carry on, so a web host that stopped accepting the file would leave every light
+      on the Pi green while the live page went stale. The record is written inside
+      push() rather than at the call sites, so every caller is covered by construction.
+      No staleness check: publishing happens when there is something to publish, so a
+      quiet week is a quiet week. Only a failed attempt turns it red.
+
+    - THE WEBHOOK was made more invisible by its own safety net. Reconcile backfills
+      whatever the webhook drops, which means a dead webhook now has no consequence at
+      all -- the log stays correct while the sensor rots, and the failure from item 8
+      would never be noticed again. Age is no test here either (a week without a
+      delivery is a week of not watching Plex). The measure is reconcile itself: every
+      row it recovers is one the webhook should have delivered. A recovery more recent
+      than the last live delivery is the webhook failing now; a delivery after the last
+      recovery is it coming back.
+
+    - Found while rewriting _beat: STALE AND FAILED are different states and the health
+      line only checked one. Reconcile could raise at 10:00, still be holding a 09:00
+      success inside the two-hour window, and read green for another hour -- exactly the
+      case the health line was built for. It now goes red on either, and says which.
+
+    That is four heartbeats for four moving parts, and the rule from item 16 has now been
+    applied to everything that was already here, not just to what comes next.
+
+19. Correcting a bad TMDb match, finally. Flagged as the one open correctness hole since
+    the enricher was written: search takes the most popular result, "Dark Matter" is two
+    different shows, and a wrong guess put a wrong IMDb link on a public page with no way
+    to fix it.
+
+    The correction is against the TITLE, not the entry -- one show resolves once and every
+    entry carries the answer -- so it repoints every event whose title normalises to the
+    same key, not just the row that was clicked. It writes the titles cache with locked=1,
+    which is the first thing that has ever set a flag the schema has had since day one.
+    tmdb_id is dropped rather than kept: it was resolved alongside the IMDb id that just
+    turned out to be wrong, so it points at the same wrong show, and a null is more honest
+    than a stale pointer.
+
+    The admin page now also shows what each entry resolved to. Without that the feature is
+    unusable -- there was no way to see a wrong match from the place you would fix it.

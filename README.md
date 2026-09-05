@@ -88,12 +88,19 @@ internet. It can:
 - **edit** season, episode and episode title on any entry backed by a single event, which
   is every Apple TV entry, because the device reports none of the three
 - **add** an entry outright, resolving the IMDb link and year from the title
+- **fix a bad match** — TMDb search takes the most popular result, which for an ambiguous
+  title ("Dark Matter" is a 2024 Apple TV+ series and a 2015 Syfy one) is sometimes the
+  wrong show, and the result is a wrong IMDb link on a public page. Typing the right id
+  repoints every entry for that show — including other spellings that normalise to the
+  same key — and pins it in the `titles` cache with `locked=1`, which is the first thing
+  that has ever set the flag the schema always had. The stale `tmdb_id` is dropped rather
+  than kept, since it was resolved alongside the id that turned out to be wrong.
 - **report health** — see below
 
 ## Staying alive
 
-Three of this system's components have a healthy state that looks exactly like a dead
-one: they are silent when idle. All three have failed silently at least once.
+Every component here has a healthy state that looks exactly like a dead one: they are all
+silent when idle. Most of them have failed silently at least once.
 
 - **The Plex webhook** stops without warning. PMS asks plex.tv for its hook list *once, at
   startup*; if that request loses a race with DNS after a reboot, it delivers to zero
@@ -105,16 +112,34 @@ one: they are silent when idle. All three have failed silently at least once.
   so the half-open connection a router reboot leaves behind made it await forever — with
   the process up, the socket still `ESTABLISHED`, and nothing in the log. The poll is now
   bounded, and a few unanswered polls in a row force a reconnect.
+- **Publishing** can fail on its own. Two of `push()`'s three callers catch the exception
+  and carry on, so a web host that had stopped accepting the file would leave everything
+  on the Pi looking perfect while the live page quietly went stale.
 
-So both sensors record a heartbeat, and the admin page shows them:
+So each of them records what happened, and the admin page reads it back:
 
 ```
-● Last reconcile 18 minutes ago
+● Plex webhook delivered 2 hours ago
 ● Apple TV listener polled just now
+● Last reconcile 18 minutes ago
+● Last publish 18 minutes ago
 ```
 
-Either goes red, with the error, once it stops being refreshed. A heartbeat that has gone
-stale is the only thing that distinguishes working from wedged.
+A line goes red two ways, and they are not the same thing:
+
+- **Stale** — a heartbeat that has stopped being refreshed. Applies only to something with
+  a cadence to miss: reconcile runs hourly, the listener polls constantly. Publishing has
+  no cadence, so a quiet week there is a quiet week, not a fault.
+- **Failed** — the last attempt raised, whatever its age. Age alone was not enough:
+  reconcile could error at 10:00, still be holding a 09:00 success, and read green for
+  another hour.
+
+The webhook needs a third test, because reconcile made it *more* invisible rather than
+less: with the safety net backfilling whatever it drops, a dead webhook has no visible
+consequence at all — the log stays correct while the sensor rots. What gives it away is
+reconcile finding anything, since every row it recovers is one the webhook should have
+delivered. A recovery more recent than the last live delivery turns the line red; a
+delivery after the last recovery means it came back.
 
 **Anything added here should carry a heartbeat from the start.**
 
