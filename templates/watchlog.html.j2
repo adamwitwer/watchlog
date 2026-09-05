@@ -128,11 +128,55 @@
 
   .empty { color: var(--muted); font-size: 1.05rem; }
 
+  /* --- search --------------------------------------------------------------
+     Hidden in the markup and revealed by the script, so a browser with no
+     JavaScript is never shown a box that cannot do anything. Everything else
+     on this page still works without it. */
+  .search { margin-top: 1.9rem; }
+  .search[hidden] { display: none; }
+
+  .search form {
+    display: flex;
+    align-items: baseline;
+    gap: 0.85rem;
+  }
+
+  .search input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--fg);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0;
+    padding: 0.35rem 0;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: border-color 0.18s ease;
+  }
+  .search input::placeholder { color: var(--muted); opacity: 1; }
+  .search input:focus { outline: none; border-bottom-color: var(--accent); }
+  .search input::-webkit-search-cancel-button { cursor: pointer; }
+
+  .count {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  li.off { display: none; }
+
   /* --- timeline rail -------------------------------------------------------
      One hairline per entry, newest at the top, so a year of viewing reads as
      texture: the dense stretches are the busy weeks. Hovering a tick expands it
-     and labels it with its date; clicking jumps to that entry. All of it is
-     plain anchors and CSS -- the page still ships no JavaScript.
+     and labels it with its date; clicking jumps to that entry. It is plain
+     anchors and CSS; the only script that touches it is the search, which
+     rebuilds it from the entries a query left standing.
 
      Only the first tick of each month is a tab stop. 150 tab stops before the
      content would be hostile, and the fine ticks are a pointer affordance for
@@ -158,6 +202,8 @@
        clipping the box erases them. Overflow is prevented instead by giving
        the ticks no minimum height: flex items with no floor always fit. */
   }
+
+  .rail[hidden] { display: none; }
 
   .tick {
     flex: 1 1 0;
@@ -255,12 +301,26 @@
       What I've been watching, logged automatically from
       <a href="https://www.plex.tv">Plex</a> and the Apple TV.
     </p>
+
+    {% if entries %}
+    <div class="search" hidden>
+      <form role="search">
+        {# The placeholder is kept short enough to survive a 320px screen,
+           where the column has to leave room for the rail as well. #}
+        <input type="search" autocomplete="off" spellcheck="false"
+               enterkeyhint="search" aria-label="Filter the log"
+               placeholder="Filter &mdash; show, film, episode">
+        <span class="count" aria-live="polite"></span>
+      </form>
+    </div>
+    {% endif %}
   </header>
 
   {% if entries %}
   <ol>
     {% for entry in entries %}
-    <li id="{{ entry.anchor }}">
+    <li id="{{ entry.anchor }}" data-q="{{ entry.q }}"
+        data-mkey="{{ entry.month_key }}" data-mon="{{ entry.month_short }}">
       <p class="title">
         {%- if entry.imdb_id %}
         <a href="https://www.imdb.com/title/{{ entry.imdb_id }}/">{{ entry.title }}</a>
@@ -304,5 +364,126 @@
   </footer>
 
 </div>
+{% if entries %}
+<script>
+/* Filter the log as you type. Every entry is already in the page, so this is
+   one substring test per row per keystroke -- no index, no debounce, no fetch,
+   and nothing to go stale.
+
+   The typed query is folded exactly the way render.py folded each row's
+   data-q. The two have to agree; see search_normalize() over there. */
+(function () {
+  var box = document.querySelector('.search');
+  var list = document.querySelector('ol');
+  if (!box || !list) return;
+
+  var input = box.querySelector('input');
+  var count = box.querySelector('.count');
+  var rows = Array.prototype.slice.call(list.children);
+  var rail = document.querySelector('.rail');
+  var fullRail = rail ? rail.innerHTML : '';
+
+  function fold(text) {
+    return text.toLowerCase()
+      .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .replace(/['’]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  /* Every word has to appear somewhere in the row, in any order, so
+     "severance milchick" finds the night without knowing how the line reads. */
+  function matches(row, words) {
+    for (var i = 0; i < words.length; i++) {
+      if (row.dataset.q.indexOf(words[i]) === -1) return false;
+    }
+    return true;
+  }
+
+  /* A filtered rail can't reuse the ticks that were rendered: they are thinned
+     to one in N of the whole log, and most of the survivors are now hidden.
+     Rebuild it instead -- one tick per month, pointing at that month's topmost
+     surviving entry. Below two months there is nothing to scrub between, so
+     the rail leaves rather than standing full-height beside four results. */
+  function rebuildRail(visible) {
+    var frag = document.createDocumentFragment();
+    var last = null;
+    var months = 0;
+
+    visible.forEach(function (row) {
+      if (row.dataset.mkey === last) return;
+      last = row.dataset.mkey;
+      months++;
+
+      var date = row.querySelector('.meta span');
+      date = date ? date.textContent : row.dataset.mon;
+
+      var tick = document.createElement('a');
+      tick.className = 'tick tick--month';
+      tick.href = '#' + row.id;
+      tick.setAttribute('data-month', row.dataset.mon);
+      tick.setAttribute('aria-label', date);
+
+      var label = document.createElement('span');
+      label.className = 'tick-label';
+      label.textContent = date;
+      tick.appendChild(label);
+      frag.appendChild(tick);
+    });
+
+    rail.textContent = '';
+    rail.hidden = months < 2;
+    if (!rail.hidden) rail.appendChild(frag);
+  }
+
+  function apply() {
+    var words = fold(input.value).split(' ').filter(Boolean);
+    var visible = [];
+
+    rows.forEach(function (row) {
+      var hit = !words.length || matches(row, words);
+      row.classList.toggle('off', !hit);
+      if (hit) visible.push(row);
+    });
+
+    if (!words.length) {
+      count.textContent = '';
+      if (rail) { rail.innerHTML = fullRail; rail.hidden = false; }
+      return;
+    }
+
+    count.textContent = visible.length
+      ? visible.length + ' of ' + rows.length
+      : 'no matches';
+    if (rail) rebuildRail(visible);
+  }
+
+  /* One input and no button means Enter would submit the form and reload the
+     page, throwing away the filter it was meant to confirm. */
+  box.querySelector('form').addEventListener('submit', function (event) {
+    event.preventDefault();
+  });
+
+  input.addEventListener('input', apply);
+  input.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && input.value) {
+      input.value = '';
+      apply();
+    }
+  });
+
+  /* "/" to search, the way it works most other places. */
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (document.activeElement === input) return;
+    event.preventDefault();
+    input.focus();
+    box.scrollIntoView({ block: 'center' });
+  });
+
+  box.hidden = false;
+})();
+</script>
+{% endif %}
 </body>
 </html>

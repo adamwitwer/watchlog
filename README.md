@@ -44,12 +44,11 @@ web host. The only public surface is that flat file.
 
 ### The page
 
-Newest first, large type, no images, no JavaScript. Each entry carries the title, the
-season and episode where they're known, the episode title, the date, the service, and a
-link to IMDb.
+Newest first, large type, no images. Each entry carries the title, the season and episode
+where they're known, the episode title, the date, the service, and a link to IMDb.
 
 - **Every entry is shown.** `PAGE_LIMIT` is `None`. The page is repetitive enough to
-  compress about 10:1 — 232 entries are 135KB of HTML and 13KB over the wire — so there is
+  compress about 10:1 — 233 entries are 164KB of HTML and 18KB over the wire — so there is
   little reason to cap it.
 - **Episode titles** appear for nights of up to `EPISODE_TITLES_MAX` episodes. A longer
   binge keeps the episode range and drops the titles rather than turning one scannable
@@ -60,6 +59,24 @@ link to IMDb.
   jumps to that entry. On touch it becomes a labelled month index instead, since hover
   cannot reveal anything and a 4px tick is not a tap target. Past `RAIL_MAX_TICKS` the
   fine ticks thin out so the rail stays legible however long the log gets.
+- **Filtering** narrows the list as you type — `/` to focus, Escape to clear. Every entry
+  is already in the page, so this is one substring test per row per keystroke: about
+  0.2ms for the whole log, with no index and nothing to fetch. It matches the title, the
+  season and episode label, the episode titles and the service, but not the year: on a
+  page this full of numbers, typing `2019` to find one film would return everything
+  released that year. While a filter is on, the rail rebuilds itself from the survivors,
+  one tick per month, and disappears entirely when fewer than two months are left.
+
+The one piece of JavaScript on the page is that filter, about 90 lines, inline. The
+search box ships `hidden` and the script reveals it, so a browser without JavaScript is
+never shown an input that cannot do anything — and everything else here, the rail
+included, is anchors and CSS that works regardless.
+
+Each row carries a `data-q` attribute holding its searchable text, folded by
+`render.search_normalize` — lowercased, diacritics stripped, apostrophes deleted so
+`bobs` finds `Bob's`. The browser folds the typed query the same way. Those two folds
+have to agree, so `tests/test_search.py` extracts the template's `fold()` and runs it
+under node against the Python over the same corpus.
 
 ### The admin page
 

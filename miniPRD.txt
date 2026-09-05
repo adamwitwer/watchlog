@@ -291,3 +291,28 @@ RISKS AND OPEN QUESTIONS
     the pattern is identical every time: a component whose healthy state is silence,
     with nothing distinguishing that from death. Anything added here should carry a
     heartbeat from the start.
+
+17. Type-to-filter on the page. Adam asked for "a very fast search that narrows what it
+    shows, as you type." With every entry already in the DOM there is nothing to build:
+    233 substring tests per keystroke measured 0.23ms in Chrome, on the worst case of a
+    query that matches everything. No debounce, no index, no fetch.
+
+    Three decisions worth keeping:
+
+    - Match the title, the S/E label, the episode titles and the service -- but NOT the
+      year. Half the numbers on this page are years; typing "2019" to find one film
+      would hand back everything released that year. Time is the rail's job.
+    - The haystack is built in Python (render.search_normalize) and shipped as data-q,
+      rather than scraped from the DOM at load. It costs ~3KB gzipped and buys a field
+      list that is reviewable and tested instead of implicit in a DOM walk. The browser
+      has to fold the typed query identically, which is a second implementation of one
+      rule -- so tests/test_search.py pulls fold() out of the template and runs it under
+      node against the Python.
+    - A filtered rail cannot reuse the rendered ticks: they are thinned to one in N of
+      the full log and most survivors are hidden. It rebuilds from what is left, one
+      tick per month, and hides below two months -- a full-height scrubber beside four
+      results is furniture, not navigation.
+
+    This is the first JavaScript on the public page. The box ships hidden and the script
+    reveals it, so no-JS sees no dead input, and the rail and anchors still work without
+    it. If more script ever lands here, that is the shape to keep.
