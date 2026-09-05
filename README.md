@@ -112,9 +112,10 @@ silent when idle. Most of them have failed silently at least once.
   so the half-open connection a router reboot leaves behind made it await forever — with
   the process up, the socket still `ESTABLISHED`, and nothing in the log. The poll is now
   bounded, and a few unanswered polls in a row force a reconnect.
-- **Publishing** can fail on its own. Two of `push()`'s three callers catch the exception
-  and carry on, so a web host that had stopped accepting the file would leave everything
-  on the Pi looking perfect while the live page quietly went stale.
+- **Publishing** can fail on its own. Three of `push()`'s four callers catch the
+  exception and carry on — only reconcile lets it propagate — so a web host that had
+  stopped accepting the file would leave everything on the Pi looking perfect while the
+  live page quietly went stale.
 
 So each of them records what happened, and the admin page reads it back:
 

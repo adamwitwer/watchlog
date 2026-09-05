@@ -319,10 +319,11 @@ RISKS AND OPEN QUESTIONS
 
 18. Closed the last two silent-failure gaps, and found a third while doing it.
 
-    - PUBLISHING had no heartbeat. push() has three callers and two of them -- the
-      webhook's debounced timer and the admin's republish -- catch the exception and
-      carry on, so a web host that stopped accepting the file would leave every light
-      on the Pi green while the live page went stale. The record is written inside
+    - PUBLISHING had no heartbeat. push() has four callers and three of them -- the
+      webhook's debounced timer, the Apple TV listener's, and the admin's republish --
+      catch the exception and carry on; only reconcile lets it propagate. A web host
+      that stopped accepting the file would leave every light on the Pi green while the
+      live page went stale. The record is written inside
       push() rather than at the call sites, so every caller is covered by construction.
       No staleness check: publishing happens when there is something to publish, so a
       quiet week is a quiet week. Only a failed attempt turns it red.

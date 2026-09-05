@@ -83,7 +83,7 @@ META_APPLETV_OK = "appletv_ok_at"
 
 # Publishing is the last link in the chain and had no heartbeat: if the rsync to
 # the web host started failing, everything on the Pi would still look perfect
-# while the live page quietly went stale. Two of its three callers swallow the
+# while the live page quietly went stale. Three of its four callers swallow the
 # exception, so the record is written inside push() where every caller is
 # covered. Age means nothing here -- no publish for three days is just three
 # days of not watching anything -- so this line goes red on a failed attempt,

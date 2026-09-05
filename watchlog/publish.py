@@ -23,10 +23,11 @@ def _record(key, value):
 def push(local_path=None):
     """Publish, and leave a record either way.
 
-    The record lives here rather than in the callers because two of the three
-    -- the webhook's debounced timer and the admin's republish -- catch the
-    exception and carry on. From outside, a web host that has stopped accepting
-    the file looks exactly like one that is up to date.
+    The record lives here rather than in the callers because three of the four
+    -- the webhook's debounced timer, the Apple TV listener's, and the admin's
+    republish -- catch the exception and carry on. Only reconcile lets it
+    propagate. From outside, a web host that has stopped accepting the file
+    looks exactly like one that is up to date.
     """
     try:
         result = _push(local_path)
