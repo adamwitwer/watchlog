@@ -3,140 +3,173 @@
 A running list of what I watch, published automatically to
 **[adamwitwer.com/watchlog](https://adamwitwer.com/watchlog)**.
 
-No confirmation step, no manual entry, nothing to maintain. Things I watch on Plex and
-on the Apple TV show up on a page. If I don't want one there, I delete it.
+Nothing stands between watching something and it appearing on the page — no confirmation
+step, no queue to review. What the sensors can't see, I can type in afterwards. Anything
+I'd rather not have up there, I delete.
 
 Design and decisions: [`miniPRD.txt`](miniPRD.txt)
 
-## Status
-
-**Phase 0 — complete.** The Apple TV is paired over Companion and AirPlay, and a push
-listener captured what each app reports. The finding that mattered: **Netflix reports no
-metadata at all** — while it is actively playing, the Apple TV exposes only the bundle
-identifier, with no title, position, or duration. Netflix is therefore out of v1. The
-Apple TV app works, at series level.
-
-**Phase 1 — live** at [adamwitwer.com/watchlog](https://adamwitwer.com/watchlog).
-Plex webhook receiver, SQLite storage, night-grouping, the rendered page, and the rsync
-publisher, running as `watchlog-webhook.service` on the Pi. Backfilled from Plex's own
-watch history, so the page started populated rather than empty.
-
-**Phase 2 — running.** `watchlog-appletv.service` holds a `pyatv` connection to the
-Apple TV, using push updates for session boundaries and polling for position. Apps are
-allowlisted, which is also what keeps Plex-on-the-Apple-TV from being counted twice.
-
-**Phase 3 — running.** TMDb resolves Apple TV titles to IMDb ids and years, cached, with
-a `locked` flag for correcting a bad match by hand.
-
-**Phase 4 — running.** A small delete UI on the Pi (`watchlog-admin.service`), bound to
-the LAN and Tailnet only. Deleting hides rather than destroys and republishes
-immediately; removed entries can be restored.
-
-**v1 is complete.** Netflix is Phase 5, and only if the gap proves annoying.
-
-**Episode titles and manual details — running.** The page shows the episode title
-under each entry, for nights of up to `EPISODE_TITLES_MAX` episodes (a long binge keeps
-the range and drops the titles, rather than turning one line into a paragraph). Plex's
-"Episode 4" placeholders are treated as absent, since they only restate the label above
-them. The admin page accepts season, episode and episode title by hand for any entry
-backed by a single event — which is every Apple TV entry, because the device reports
-none of the three.
-
-**The whole log, and a timeline rail — running.** `PAGE_LIMIT` is `None`: the page shows
-every entry, back to where the Plex history starts. It costs little — 232 entries render
-to 135KB, which the host serves as 13KB gzipped, the markup being repetitive enough to
-compress about 10:1. A rail of hairlines down the right edge, one per entry, gives the
-year a texture; hovering expands a tick and labels it, clicking jumps to it, and on touch
-it collapses to a labelled month index. Past `RAIL_MAX_TICKS` the fine ticks thin out, so
-the rail stays legible however long the log gets.
-
-**Health lines — running.** The admin page says when reconcile last succeeded and when
-the Apple TV listener last polled, and turns red with the error once either goes stale.
-Both sensors are silent when healthy and idle, so silence proves nothing on its own — a
-heartbeat that stopped being refreshed is the only difference between working and wedged.
-The Apple TV poll is also bounded now: `atv.metadata.playing()` has no timeout of its
-own, and a half-open connection left the listener awaiting forever, alive and quiet, for
-eleven hours.
-
-**Manual entry — running.** The admin page can create whole entries, for the platforms
-no sensor reaches — Netflix above all, which reports nothing at all from the Apple TV.
-Pick a date and a service, type a title, and the IMDb id and year are resolved from TMDb
-the same way an Apple TV entry's are. Entries are stored with `source = manual` and the
-same dedup key shape the sensors write, so a typed entry and a scrobble for the same
-episode still recognise each other.
-
-**Reconcile — running.** `watchlog-reconcile.timer` re-reads the last week of Plex's own
-history every hour and imports anything the webhook missed. It exists because the webhook
-turned out to have a silent failure mode: PMS asks plex.tv for its hook list *once, at
-startup*, and if that request loses a race with DNS after a reboot it delivers to zero
-hooks until someone restarts it. The reconcile pass writes the same dedup key the webhook
-does, so live-delivered plays are recognised and skipped, and it only republishes when
-something actually landed.
-
 ## How it works
 
-Two sensors feed one SQLite database on a Raspberry Pi, which renders a single static
-HTML file and rsyncs it to the web host.
+Everything with moving parts runs on a Raspberry Pi. Sensors write watch events to one
+SQLite database; the Pi renders a single self-contained HTML file and rsyncs it to the
+web host. The only public surface is that flat file.
 
-- **Plex** — Plex Pass fires a webhook at 90% watched. Device-independent, so this
-  covers Plex on the TV, in a browser, and on a phone. Plex supplies IMDb IDs directly,
+### Where entries come from
+
+- **Plex** — Plex Pass fires a webhook at 90% watched. This is server-side, so it covers
+  Plex on the TV, in a browser, and on a phone equally. Plex supplies IMDb ids directly,
   so those entries need no lookup.
-- **Apple TV** — a `pyatv` push listener on the Pi holds a connection to the Apple TV 4K
-  and reports the playing title, position, and *which app* is playing. Push updates fire
-  only on state change, so the collector also polls position on an interval. Covers
-  Apple TV+ at series level: we learn the show and the progress, but not the episode.
-- **Dedup** — Plex played on the Apple TV would otherwise be counted twice, so pyatv
-  events reporting the Plex app are ignored.
-- **Enrichment** — TMDb resolves Apple TV titles to IMDb IDs and years.
-- **Publish** — Jinja2 renders one self-contained HTML file; rsync over SSH puts it on
-  NearlyFreeSpeech, alongside an `.htaccess` that stops the host's edge cache serving a
-  stale page for a quarter of an hour after every publish.
-- **Delete** — a private admin page on the Pi lists what's published, with a button per
-  entry. Hiding is reversible.
+- **Apple TV** — a `pyatv` listener holds a connection to the Apple TV 4K and reports the
+  playing title, position, and *which app* is playing. Push updates fire only on state
+  change, so position is polled as well. Apps are allowlisted, which is also what stops
+  Plex-on-the-Apple-TV being counted twice.
+- **By hand** — the admin page can create a whole entry for anything no sensor reaches.
+  Netflix above all: it reports no metadata at all from the Apple TV, so it is typed or it
+  is nothing. Manual entries are stored with `source = manual` and the same dedup key
+  shape the sensors write, so a typed entry and a scrobble for the same episode recognise
+  each other rather than both landing on the page.
 
-Everything with moving parts runs on the Pi and is never exposed to the internet. The
-only public surface is a flat HTML file.
+### What happens to them
 
-### Known gaps
+- **Grouping** — episodes collapse into one entry per show per night, with the day rolling
+  over at `NIGHT_ROLLOVER_HOUR`. Six lines for one evening's bingeing would bury
+  everything else on a page built around large type. Movies stay individual.
+- **Enrichment** — TMDb resolves titles that arrive without ids into IMDb ids and years,
+  cached per title. A `locked` flag pins a hand-corrected match so the enricher leaves it
+  alone.
+- **Publish** — Jinja2 renders one file; rsync over SSH puts it on NearlyFreeSpeech,
+  alongside an `.htaccess` that stops the host's edge cache serving a stale page for a
+  quarter of an hour after every publish.
 
-**Netflix isn't captured at all.** Not a design choice so much as a measured limit: the
-Apple TV reports no metadata whatsoever for Netflix, and a browser is invisible to
-`pyatv` anyway. The only route left is scraping Netflix's viewing activity page, which
-is deferred rather than allowed to hold up the parts that work. A Roku on the same
-network is likewise invisible.
+### The page
+
+Newest first, large type, no images, no JavaScript. Each entry carries the title, the
+season and episode where they're known, the episode title, the date, the service, and a
+link to IMDb.
+
+- **Every entry is shown.** `PAGE_LIMIT` is `None`. The page is repetitive enough to
+  compress about 10:1 — 232 entries are 135KB of HTML and 13KB over the wire — so there is
+  little reason to cap it.
+- **Episode titles** appear for nights of up to `EPISODE_TITLES_MAX` episodes. A longer
+  binge keeps the episode range and drops the titles rather than turning one scannable
+  line into a paragraph. Plex's `Episode 4` placeholders are treated as absent, since they
+  only restate the label above them.
+- **A timeline rail** runs down the right edge, one hairline per entry, so a year of
+  viewing reads as texture. Hovering expands a tick and labels it with its date; clicking
+  jumps to that entry. On touch it becomes a labelled month index instead, since hover
+  cannot reveal anything and a 4px tick is not a tap target. Past `RAIL_MAX_TICKS` the
+  fine ticks thin out so the rail stays legible however long the log gets.
+
+### The admin page
+
+Private to the LAN and the Tailnet, 404s without its token, never exposed to the
+internet. It can:
+
+- **delete** an entry — hiding rather than destroying, so it can be restored, and
+  republishing immediately
+- **edit** season, episode and episode title on any entry backed by a single event, which
+  is every Apple TV entry, because the device reports none of the three
+- **add** an entry outright, resolving the IMDb link and year from the title
+- **report health** — see below
+
+## Staying alive
+
+Three of this system's components have a healthy state that looks exactly like a dead
+one: they are silent when idle. All three have failed silently at least once.
+
+- **The Plex webhook** stops without warning. PMS asks plex.tv for its hook list *once, at
+  startup*; if that request loses a race with DNS after a reboot, it delivers to zero
+  hooks until someone restarts it, and reports nothing.
+- **`watchlog-reconcile.timer`** covers that by re-reading the last `RECONCILE_DAYS` of
+  Plex's own history every hour and importing whatever is missing. Plex's history is the
+  server's own record and is never wrong.
+- **The Apple TV listener** can wedge. `atv.metadata.playing()` has no timeout of its own,
+  so the half-open connection a router reboot leaves behind made it await forever — with
+  the process up, the socket still `ESTABLISHED`, and nothing in the log. The poll is now
+  bounded, and a few unanswered polls in a row force a reconnect.
+
+So both sensors record a heartbeat, and the admin page shows them:
+
+```
+● Last reconcile 18 minutes ago
+● Apple TV listener polled just now
+```
+
+Either goes red, with the error, once it stops being refreshed. A heartbeat that has gone
+stale is the only thing that distinguishes working from wedged.
+
+**Anything added here should carry a heartbeat from the start.**
+
+## Running it
+
+Four systemd units on the Pi, all enabled at boot:
+
+| unit | what it does |
+| --- | --- |
+| `watchlog-webhook.service` | receives Plex scrobbles |
+| `watchlog-appletv.service` | holds the `pyatv` connection |
+| `watchlog-admin.service` | the private admin page |
+| `watchlog-reconcile.timer` | hourly catch-up against Plex history |
+
+```
+python -m watchlog.plex_history --reconcile --dry-run   # what the timer would import
+python -m watchlog.render                               # render without publishing
+python -m tests.test_grouping                           # and test_tracker, test_admin
+```
 
 ## Backfill
 
-Plex keeps its own watch history, so the log didn't have to start from zero:
+Plex keeps its own watch history, so the log didn't start from zero:
 
 ```
 python -m watchlog.plex_history --dry-run   # show what would be imported
 python -m watchlog.plex_history             # import it
 ```
 
-Apple TV has no equivalent — `pyatv` only reports what is playing right now, so
-Apple TV+ entries can only accumulate from the moment the listener starts running.
+Apple TV has no equivalent. `pyatv` only reports what is playing right now, so those
+entries accumulate only from the moment the listener starts running.
 
 ## Configuration
 
-Copy [`.env.example`](.env.example) to `.env` and fill it in. Every value the app needs
-is documented there.
+Copy [`.env.example`](.env.example) to `.env` and fill it in. Every value is documented
+there.
 
 ```
 cp .env.example .env
 ```
 
+One thing worth repeating from that file: **address the Plex host by a name, not by a
+DHCP lease.** A hardcoded `192.168.x.y` works right up until the router reboots and hands
+it a different one, at which point reconcile fails hourly and nothing gets logged. Watch
+out for hosts with more than one active interface, too — a Mac with Ethernet and Wi-Fi
+both up holds two addresses, and the wired one can be an order of magnitude faster.
+
+## Known limits
+
+- **Netflix has no automatic path.** Not a design choice: the Apple TV reports no metadata
+  whatsoever for Netflix, and a browser is invisible to `pyatv` anyway. Scraping the
+  viewing activity page was always the most fragile thing in the design, and typing an
+  entry takes seconds, so it stays unbuilt.
+- **Apple TV+ entries arrive without season or episode.** The device reports a series name
+  and nothing more. They can be filled in by hand.
+- **The Apple TV listener only sees the living-room box.** Plex is observed at the server
+  and so covers every client; the Apple TV is observed at one device. Watching Apple TV+
+  on a laptop or a phone is invisible.
+- **There is no UI for correcting a bad TMDb match.** The `titles.locked` column exists
+  for it, but nothing exposes it yet.
+
 ## A note on what's public
 
 The code is public. The data is not, and the split is deliberate:
 
-- **`watchlog.db` is gitignored.** It holds every watch event, including ones deleted
-  from the published page. Committing it would republish exactly what a delete was meant
-  to remove.
+- **`watchlog.db` is gitignored.** It holds every watch event, including ones deleted from
+  the published page. Committing it would republish exactly what a delete was meant to
+  remove.
 - **The rendered `watchlog.html` is gitignored too.** It's generated output, and its git
   history would become a permanent record of every entry ever deleted.
-- **Apple TV pairing credentials and the NFSN SSH key never enter the repo.** Keys live
-  in `~/.ssh` on the Pi and are referenced by path.
+- **Apple TV pairing credentials and the NFSN SSH key never enter the repo.** Keys live in
+  `~/.ssh` on the Pi and are referenced by path.
 
 The published page is the only thing anyone is meant to see, and deleting from it should
 actually mean something.
