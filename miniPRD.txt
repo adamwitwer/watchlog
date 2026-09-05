@@ -277,3 +277,17 @@ RISKS AND OPEN QUESTIONS
     rail offset + rail width + label gap + label width. The rail was also 3.1rem wide
     to hold a 10px tick, so it was narrowed to 1.4rem and the padding raised to
     4.4rem, leaving 15px of clearance.
+
+16. RESOLVED. The Apple TV listener could wedge silently and did. atv.metadata.playing()
+    has no timeout, so the half-open connection a router reboot leaves behind made the
+    poll loop await forever. Everything downstream looked fine: the process was up,
+    systemctl said active, the sockets were still ESTABLISHED, and there was not one
+    line in the log -- because idle is this listener's normal state. Caught on
+    2026-09-04 only by reading `ss -tni`: lastsnd was 11.5 hours on a 30-second poll.
+    Fixed with asyncio.wait_for around the poll, a forced reconnect after
+    APPLETV_MAX_POLL_FAILURES unanswered polls, and a heartbeat the admin page reads.
+
+    Three silent failures in this project now -- webhook, reconcile, listener -- and
+    the pattern is identical every time: a component whose healthy state is silence,
+    with nothing distinguishing that from death. Anything added here should carry a
+    heartbeat from the start.

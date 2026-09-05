@@ -73,6 +73,14 @@ RECONCILE_DAYS = 7
 # the admin page should say so in red rather than stay quietly reassuring.
 RECONCILE_STALE_AFTER_HOURS = 2
 
+# Keys for the little meta table the health line reads. Defined here so the
+# admin process can name them without importing the Apple TV listener, and with
+# it pyatv.
+META_RECONCILE_OK = "reconcile_ok_at"
+META_RECONCILE_ERROR = "reconcile_error"
+META_RECONCILE_ERROR_AT = "reconcile_error_at"
+META_APPLETV_OK = "appletv_ok_at"
+
 # Episode titles are listed for a night up to this many episodes, then withheld
 # so a long binge doesn't turn one scannable line into a paragraph. Measured
 # against real data: 229 of 231 entries are three episodes or fewer.
@@ -90,6 +98,20 @@ PLEX_SERVER_URL = _get("PLEX_SERVER_URL", "")
 
 # Push updates fire only on state change, so position has to be polled.
 APPLETV_POLL_SECONDS = 30
+
+# atv.metadata.playing() has no timeout of its own. A half-open connection --
+# which is what a router reboot leaves behind -- makes it await forever, and the
+# listener then sits there looking perfectly healthy: process up, socket still
+# ESTABLISHED, not one line in the log. Measured on 2026-09-04, it had polled
+# nothing for 11 hours. Bound the wait, and give up on the connection after a
+# few in a row so the reconnect loop can do its job.
+APPLETV_POLL_TIMEOUT = 15
+APPLETV_MAX_POLL_FAILURES = 3
+
+# How often the listener records that it is alive, and how long that record can
+# go unrefreshed before the admin page calls it stale.
+APPLETV_HEARTBEAT_SECONDS = 300
+APPLETV_STALE_AFTER_MINUTES = 15
 
 # An allowlist rather than a blocklist: only these apps are logged. This is also
 # what keeps Plex-on-the-Apple-TV from being counted twice, since the Plex

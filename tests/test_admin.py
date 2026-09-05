@@ -160,7 +160,7 @@ def now(offset_hours=0):
 with db.connect() as conn:
     conn.execute("DELETE FROM meta")
 check("with nothing recorded, health reads as unknown",
-      admin._health()["state"] == "unknown")
+      admin._health()[0]["state"] == "unknown")
 
 # The recording itself: a success clears any standing error, a failure keeps it
 # and still raises so systemd sees a failed unit.
@@ -187,7 +187,7 @@ check("a failing reconcile records why",
 # What the admin page makes of it.
 db.set_meta(plex_history.OK_AT, now())
 db.set_meta(plex_history.ERROR, "")
-health = admin._health()
+health = admin._health()[0]
 check("a fresh heartbeat reads as ok", health["state"] == "ok")
 check("and says how long ago", "ago" in health["text"] or "just now" in health["text"])
 check("no error is shown while healthy", health["error"] is None)
@@ -195,7 +195,7 @@ check("no error is shown while healthy", health["error"] is None)
 db.set_meta(plex_history.OK_AT, now(-5))
 db.set_meta(plex_history.ERROR, "ConnectionError: No route to host")
 db.set_meta(plex_history.ERROR_AT, now(-1))
-health = admin._health()
+health = admin._health()[0]
 check("a heartbeat older than the threshold reads as stale",
       health["state"] == "stale")
 check("stale says plainly that something is wrong",
@@ -208,7 +208,28 @@ check("the error text renders too", "No route to host" in page)
 
 db.set_meta(plex_history.OK_AT, now())
 db.set_meta(plex_history.ERROR, "")
-check("recovering clears the warning", admin._health()["state"] == "ok")
+check("recovering clears the warning", admin._health()[0]["state"] == "ok")
+
+# --- the Apple TV listener's own heartbeat ---------------------------------
+# It is silent when idle and was found wedged for 11 hours with no error, so a
+# heartbeat is the only thing that separates working from stuck.
+
+check("both sensors get a health line", len(admin._health()) == 2)
+
+db.set_meta(config.META_APPLETV_OK, now())
+atv = admin._health()[1]
+check("a fresh Apple TV heartbeat reads as ok", atv["state"] == "ok")
+
+db.set_meta(config.META_APPLETV_OK, now(-1))
+atv = admin._health()[1]
+check("an Apple TV heartbeat an hour old reads as stale", atv["state"] == "stale")
+check("and says so plainly", "something is wrong" in atv["text"])
+
+with db.connect() as conn:
+    conn.execute("DELETE FROM meta WHERE key = ?", (config.META_APPLETV_OK,))
+check("never having reported reads as unknown, not ok",
+      admin._health()[1]["state"] == "unknown")
+db.set_meta(config.META_APPLETV_OK, now())
 
 # --- the page itself -------------------------------------------------------
 

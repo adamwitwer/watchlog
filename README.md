@@ -50,10 +50,13 @@ year a texture; hovering expands a tick and labels it, clicking jumps to it, and
 it collapses to a labelled month index. Past `RAIL_MAX_TICKS` the fine ticks thin out, so
 the rail stays legible however long the log gets.
 
-**Health line — running.** The admin page says when reconcile last succeeded, and turns
-red with the error if it hasn't reported within `RECONCILE_STALE_AFTER_HOURS`. The
-reconcile pass covers a webhook that fails silently, which makes it exactly the thing
-that must not fail silently itself.
+**Health lines — running.** The admin page says when reconcile last succeeded and when
+the Apple TV listener last polled, and turns red with the error once either goes stale.
+Both sensors are silent when healthy and idle, so silence proves nothing on its own — a
+heartbeat that stopped being refreshed is the only difference between working and wedged.
+The Apple TV poll is also bounded now: `atv.metadata.playing()` has no timeout of its
+own, and a half-open connection left the listener awaiting forever, alive and quiet, for
+eleven hours.
 
 **Manual entry — running.** The admin page can create whole entries, for the platforms
 no sensor reaches — Netflix above all, which reports nothing at all from the Apple TV.

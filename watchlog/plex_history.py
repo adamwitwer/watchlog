@@ -208,9 +208,9 @@ def backfill(dry_run=False):
     return inserted
 
 
-OK_AT = "reconcile_ok_at"
-ERROR = "reconcile_error"
-ERROR_AT = "reconcile_error_at"
+OK_AT = config.META_RECONCILE_OK
+ERROR = config.META_RECONCILE_ERROR
+ERROR_AT = config.META_RECONCILE_ERROR_AT
 
 
 def reconcile(days=None, dry_run=False):

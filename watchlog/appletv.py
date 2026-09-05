@@ -12,6 +12,7 @@ entries here group by show and night and carry no episode label.
 """
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 
 import pyatv
@@ -151,6 +152,24 @@ class Collector:
     def __init__(self):
         self.tracker = Tracker()
         self.publish_timer = None
+        self._last_beat = 0.0
+
+    def _heartbeat(self):
+        """Record that the listener is actually polling, not just running.
+
+        Idle is this listener's normal state, so silence proves nothing on its
+        own -- which is how it managed to be dead for eleven hours without
+        anything noticing. The admin page reads this.
+        """
+        now = time.monotonic()
+        if now - self._last_beat < config.APPLETV_HEARTBEAT_SECONDS:
+            return
+        self._last_beat = now
+        try:
+            db.set_meta(config.META_APPLETV_OK,
+                        datetime.now(timezone.utc).isoformat())
+        except Exception:
+            log.exception("could not record heartbeat")
 
     def _schedule_publish(self):
         loop = asyncio.get_running_loop()
@@ -218,6 +237,7 @@ class Collector:
         log.info("connected to %s, polling every %ss",
                  conf.name, config.APPLETV_POLL_SECONDS)
 
+        failures = 0
         try:
             while not lost.is_set():
                 try:
@@ -225,11 +245,31 @@ class Collector:
                     break
                 except asyncio.TimeoutError:
                     pass
+
+                # Bounded, because playing() will otherwise wait forever on a
+                # half-open connection and take the whole listener with it.
                 try:
-                    playing = await atv.metadata.playing()
-                    self._handle(playing, atv.metadata.app)
+                    playing = await asyncio.wait_for(
+                        atv.metadata.playing(), config.APPLETV_POLL_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    failures += 1
+                    log.warning("poll timed out (%d in a row)", failures)
                 except Exception as exc:
-                    log.warning("poll failed: %s", exc)
+                    failures += 1
+                    log.warning("poll failed (%d in a row): %s", failures, exc)
+                else:
+                    failures = 0
+                    self._heartbeat()
+                    try:
+                        self._handle(playing, atv.metadata.app)
+                    except Exception:
+                        log.exception("poll handling failed")
+
+                if failures >= config.APPLETV_MAX_POLL_FAILURES:
+                    raise _Disconnected(
+                        f"{failures} polls in a row went unanswered"
+                    )
         finally:
             atv.close()
         raise _Disconnected("device connection ended")

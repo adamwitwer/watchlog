@@ -116,8 +116,9 @@
   }
   .health {
     display: flex; align-items: baseline; gap: 0.5rem;
-    font-size: 0.78rem; color: var(--muted); margin: 0 0 1.5rem;
+    font-size: 0.78rem; color: var(--muted); margin: 0 0 0.35rem;
   }
+  .health:last-of-type { margin-bottom: 1.5rem; }
   .health .dot {
     width: 7px; height: 7px; border-radius: 50%; flex: none;
     background: var(--accent);
@@ -192,15 +193,17 @@
     </form>
   </details>
 
-  <p class="health{% if health.state == 'stale' %} is-stale{% elif health.state == 'unknown' %} is-unknown{% endif %}">
+  {% for beat in health %}
+  <p class="health{% if beat.state == 'stale' %} is-stale{% elif beat.state == 'unknown' %} is-unknown{% endif %}">
     <span class="dot"></span>
     <span>
-      {{ health.text }}
-      {% if health.error %}
-      <span class="detail">Last error {{ health.error_ago }}: {{ health.error }}</span>
+      {{ beat.text }}
+      {% if beat.error %}
+      <span class="detail">Last error {{ beat.error_ago }}: {{ beat.error }}</span>
       {% endif %}
     </span>
   </p>
+  {% endfor %}
 
   <h2>Published — {{ visible|length }} entries</h2>
   {% if visible %}

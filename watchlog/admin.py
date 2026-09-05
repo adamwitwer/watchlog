@@ -25,7 +25,7 @@ from datetime import datetime, time, timezone
 from flask import (Flask, make_response, redirect, render_template,
                    request, url_for)
 
-from . import config, db, enrich, plex_history, publish, render
+from . import config, db, enrich, publish, render
 from .grouping import group, normalize
 
 log = logging.getLogger("watchlog.admin")
@@ -61,33 +61,46 @@ def _ago(iso):
     return f"{hours // 24} days ago"
 
 
-def _health():
-    """Whether the safety net is actually running.
+def _beat(label, key, stale_after_seconds, cadence, error_key=None,
+          error_at_key=None):
+    """One line of 'is this thing actually running'.
 
-    The reconcile pass covers a webhook that fails silently, so it is precisely
-    the thing that must not fail silently itself. Stale counts as broken here --
-    an hourly job that hasn't reported in hours has nothing good to say.
+    Both sensors are silent when healthy and idle, so silence proves nothing.
+    A heartbeat that has stopped being refreshed is the only difference between
+    working and wedged, and stale counts as broken.
     """
-    ok_at = db.get_meta(plex_history.OK_AT)
-    error = db.get_meta(plex_history.ERROR)
-    error_at = db.get_meta(plex_history.ERROR_AT)
+    ok_at = db.get_meta(key)
+    error = db.get_meta(error_key) if error_key else None
+    error_at = db.get_meta(error_at_key) if error_at_key else None
 
     if not ok_at:
-        return {"state": "unknown", "text": "Reconcile has not reported yet.",
-                "error": error or None}
+        return {"label": label, "state": "unknown",
+                "text": f"{label} has not reported yet.", "error": error or None,
+                "error_ago": None}
 
-    age = datetime.now(timezone.utc) - datetime.fromisoformat(ok_at)
-    stale = age.total_seconds() > config.RECONCILE_STALE_AFTER_HOURS * 3600
-    text = f"Last reconcile {_ago(ok_at)}"
+    age = (datetime.now(timezone.utc) - datetime.fromisoformat(ok_at)).total_seconds()
+    stale = age > stale_after_seconds
+    text = f"{label} {_ago(ok_at)}"
     if stale:
-        text += " — it runs hourly, so something is wrong"
+        text += f" — {cadence}, so something is wrong"
     return {
+        "label": label,
         "state": "stale" if stale else "ok",
         "text": text,
         # Only worth showing while it is still the current story.
         "error": (error or None) if stale else None,
         "error_ago": _ago(error_at) if error and error_at and stale else None,
     }
+
+
+def _health():
+    return [
+        _beat("Last reconcile", config.META_RECONCILE_OK,
+              config.RECONCILE_STALE_AFTER_HOURS * 3600, "it runs hourly",
+              config.META_RECONCILE_ERROR, config.META_RECONCILE_ERROR_AT),
+        _beat("Apple TV listener polled", config.META_APPLETV_OK,
+              config.APPLETV_STALE_AFTER_MINUTES * 60, "it polls constantly"),
+    ]
 
 
 def _decorate(entries, by_id=None):
