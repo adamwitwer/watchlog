@@ -244,12 +244,19 @@ RISKS AND OPEN QUESTIONS
 
 13. RESOLVED. PLEX_SERVER_URL was a hardcoded DHCP address. Connecting the whole rack
     to the UPS on 2026-09-04 meant power-cycling the router as well, which reshuffled
-    leases: the Plex host moved from .52 to .57 and every hourly reconcile failed with
-    "No route to host" for four hours. An episode went unlogged, and the failure was
-    silent in exactly the way the reconcile pass was built to prevent -- only now it
-    was the safety net that was down. Fixed by pointing at the Tailscale MagicDNS name,
-    which no DHCP lease can change. Note mDNS was NOT a safe substitute here: the Pi
-    still resolved plex-mini.local to the old .53 for some time afterwards.
+    leases: the address it was pinned to (.52) stopped being valid and every hourly
+    reconcile failed with "No route to host" for four hours. An episode went unlogged,
+    and the failure was silent in exactly the way the reconcile pass was built to
+    prevent -- only now it was the safety net that was down. Fixed by addressing the
+    host by name instead of by lease.
+
+    CORRECTION, same day: the note here originally said mDNS was serving a stale
+    record. That was wrong. plex-mini has TWO active LAN interfaces -- en7, a USB
+    2.5G Ethernet adapter, and en1, Wi-Fi -- and mDNS was correctly resolving
+    plex-mini.local to the wired one. The error was probing only en0 and en1, finding
+    the Wi-Fi address, and assuming it was the host's only address. The distinction
+    is not academic: Plex answers in ~4.5ms on the wired interface and ~107ms over
+    Wi-Fi. A static reservation belongs on the wired interface.
 
 14. RESOLVED 2026-09-04 with the health line. Nothing watched the watcher. watchlog-reconcile is a systemd oneshot; when it
     fails it goes red in `systemctl status` and stops there. Adam found out because an
