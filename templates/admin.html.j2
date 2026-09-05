@@ -114,6 +114,18 @@
     border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem;
     margin: 0 0 1.25rem;
   }
+  .health {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    font-size: 0.78rem; color: var(--muted); margin: 0 0 1.5rem;
+  }
+  .health .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex: none;
+    background: var(--accent);
+  }
+  .health.is-stale { color: var(--danger); }
+  .health.is-stale .dot { background: var(--danger); }
+  .health.is-unknown .dot { background: var(--muted); }
+  .health .detail { display: block; opacity: 0.85; margin-top: 0.15rem; }
   .warn {
     border: 1px solid var(--danger); color: var(--danger); background: var(--card);
     border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem;
@@ -179,6 +191,16 @@
       </div>
     </form>
   </details>
+
+  <p class="health{% if health.state == 'stale' %} is-stale{% elif health.state == 'unknown' %} is-unknown{% endif %}">
+    <span class="dot"></span>
+    <span>
+      {{ health.text }}
+      {% if health.error %}
+      <span class="detail">Last error {{ health.error_ago }}: {{ health.error }}</span>
+      {% endif %}
+    </span>
+  </p>
 
   <h2>Published — {{ visible|length }} entries</h2>
   {% if visible %}

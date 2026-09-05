@@ -30,6 +30,14 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_watched  ON events(watched_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_dedup    ON events(dedup_key, watched_at);
 
+-- Small key/value scratch space. Currently just the reconcile heartbeat, which
+-- the admin page reads to say whether the safety net is actually running.
+CREATE TABLE IF NOT EXISTS meta (
+    key         TEXT PRIMARY KEY,
+    value       TEXT,
+    updated_at  TEXT
+);
+
 -- Resolved metadata, cached so each show is looked up once. Manual overrides
 -- live here too: set locked=1 and the enricher will leave the row alone.
 CREATE TABLE IF NOT EXISTS titles (
@@ -58,6 +66,23 @@ def connect():
 def init():
     with connect() as conn:
         conn.executescript(SCHEMA)
+
+
+def set_meta(key, value):
+    from datetime import datetime, timezone
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO meta (key, value, updated_at) VALUES (?, ?, ?)
+               ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                              updated_at = excluded.updated_at""",
+            (key, value, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def get_meta(key, default=None):
+    with connect() as conn:
+        row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
 
 
 def is_duplicate(event):

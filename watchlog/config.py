@@ -69,6 +69,10 @@ RAIL_MAX_TICKS = 300
 # comfortably longer than that goes unnoticed, and costs one page of history.
 RECONCILE_DAYS = 7
 
+# The timer runs hourly, so anything past this means it has missed a turn and
+# the admin page should say so in red rather than stay quietly reassuring.
+RECONCILE_STALE_AFTER_HOURS = 2
+
 # Episode titles are listed for a night up to this many episodes, then withheld
 # so a long binge doesn't turn one scannable line into a paragraph. Measured
 # against real data: 229 of 231 entries are three episodes or fewer.

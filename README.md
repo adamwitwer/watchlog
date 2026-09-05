@@ -50,6 +50,11 @@ year a texture; hovering expands a tick and labels it, clicking jumps to it, and
 it collapses to a labelled month index. Past `RAIL_MAX_TICKS` the fine ticks thin out, so
 the rail stays legible however long the log gets.
 
+**Health line — running.** The admin page says when reconcile last succeeded, and turns
+red with the error if it hasn't reported within `RECONCILE_STALE_AFTER_HOURS`. The
+reconcile pass covers a webhook that fails silently, which makes it exactly the thing
+that must not fail silently itself.
+
 **Manual entry — running.** The admin page can create whole entries, for the platforms
 no sensor reaches — Netflix above all, which reports nothing at all from the Apple TV.
 Pick a date and a service, type a title, and the IMDb id and year are resolved from TMDb

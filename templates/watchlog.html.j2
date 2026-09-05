@@ -216,8 +216,12 @@
      not a tap target. Drop to one tick per month, spaced out enough to hit,
      and give the column room so the rail never sits on top of the text. */
   @media (max-width: 46rem), (hover: none) {
-    .wrap { padding-right: 3.9rem; }
-    .rail { right: 0.5rem; width: 3.1rem; height: min(70vh, 34rem); }
+    /* The column has to clear the rail AND the month labels, which hang outside
+       the rail to its left -- clearing only the rail's own width leaves the
+       labels sitting on top of the text. The rail itself is narrowed to roughly
+       the tick, since the rest of its width was empty space. */
+    .wrap { padding-right: 4.4rem; }
+    .rail { right: 0.5rem; width: 1.4rem; height: min(70vh, 34rem); }
     .tick:not(.tick--month) { display: none; }
 
     /* Spread the months over the rail so each is a real tap target rather

@@ -251,8 +251,22 @@ RISKS AND OPEN QUESTIONS
     which no DHCP lease can change. Note mDNS was NOT a safe substitute here: the Pi
     still resolved plex-mini.local to the old .53 for some time afterwards.
 
-14. OPEN. Nothing watches the watcher. watchlog-reconcile is a systemd oneshot; when it
+14. RESOLVED 2026-09-04 with the health line. Nothing watched the watcher. watchlog-reconcile is a systemd oneshot; when it
     fails it goes red in `systemctl status` and stops there. Adam found out because an
     episode was missing. Options, cheapest first: an OnFailure= unit that pushes a
     notification; a health line on the admin page showing the last successful reconcile;
     or a heartbeat the Pi reports somewhere Adam already looks. Not built -- his call.
+
+    Built: reconcile records a heartbeat on success and the error on failure (still
+    raising, so systemd sees the failure too), and the admin page reads it -- "Last
+    reconcile 12 minutes ago", or red with the error once it misses a turn. Chosen
+    over an OnFailure notification because Adam visits the admin page anyway and it
+    needs no new plumbing. Stale counts as broken: an hourly job that hasn't reported
+    in hours has nothing good to say.
+
+15. Mobile column ran under the timeline rail. The right padding cleared the rail's
+    own width but not the month labels, which hang OUTSIDE the rail to its left --
+    a 20px overlap. The condition is viewport-independent: padding-right must exceed
+    rail offset + rail width + label gap + label width. The rail was also 3.1rem wide
+    to hold a 10px tick, so it was narrowed to 1.4rem and the padding raised to
+    4.4rem, leaving 15px of clearance.

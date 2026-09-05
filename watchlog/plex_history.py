@@ -208,13 +208,43 @@ def backfill(dry_run=False):
     return inserted
 
 
+OK_AT = "reconcile_ok_at"
+ERROR = "reconcile_error"
+ERROR_AT = "reconcile_error_at"
+
+
 def reconcile(days=None, dry_run=False):
     """Re-read the recent past and import anything the webhook missed.
 
     Safe to run as often as you like: the dedup key here is byte-identical to
     the one the webhook writes, so a play that arrived live is recognised and
     skipped rather than doubled. Only publishes when something actually landed.
+
+    Records its own outcome either way. This job is the safety net for a sensor
+    that fails silently, which makes it exactly the thing that must not fail
+    silently itself -- on 2026-09-04 it failed hourly for four hours after the
+    Plex host changed address, and the only symptom was a missing episode.
     """
+    db.init()
+    try:
+        inserted = _reconcile(days=days, dry_run=dry_run)
+    except Exception as exc:
+        if not dry_run:
+            db.set_meta(ERROR, f"{type(exc).__name__}: {exc}"[:400])
+            db.set_meta(ERROR_AT, _now())
+        raise                       # systemd should still see this as a failure
+    if not dry_run:
+        db.set_meta(OK_AT, _now())
+        db.set_meta(ERROR, "")
+    return inserted
+
+
+def _now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _reconcile(days=None, dry_run=False):
     import time
 
     days = days or config.RECONCILE_DAYS

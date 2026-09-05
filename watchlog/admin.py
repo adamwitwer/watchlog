@@ -25,7 +25,7 @@ from datetime import datetime, time, timezone
 from flask import (Flask, make_response, redirect, render_template,
                    request, url_for)
 
-from . import config, db, enrich, publish, render
+from . import config, db, enrich, plex_history, publish, render
 from .grouping import group, normalize
 
 log = logging.getLogger("watchlog.admin")
@@ -44,6 +44,50 @@ def _authorised():
 def _date_label(iso):
     moment = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone()
     return f"{moment.strftime('%b')} {moment.day}, {moment.year}"
+
+
+def _ago(iso):
+    """'12 minutes ago', roughly. Precision past the useful point is noise."""
+    delta = datetime.now(timezone.utc) - datetime.fromisoformat(iso)
+    seconds = max(0, int(delta.total_seconds()))
+    if seconds < 90:
+        return "just now"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} minutes ago"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    return f"{hours // 24} days ago"
+
+
+def _health():
+    """Whether the safety net is actually running.
+
+    The reconcile pass covers a webhook that fails silently, so it is precisely
+    the thing that must not fail silently itself. Stale counts as broken here --
+    an hourly job that hasn't reported in hours has nothing good to say.
+    """
+    ok_at = db.get_meta(plex_history.OK_AT)
+    error = db.get_meta(plex_history.ERROR)
+    error_at = db.get_meta(plex_history.ERROR_AT)
+
+    if not ok_at:
+        return {"state": "unknown", "text": "Reconcile has not reported yet.",
+                "error": error or None}
+
+    age = datetime.now(timezone.utc) - datetime.fromisoformat(ok_at)
+    stale = age.total_seconds() > config.RECONCILE_STALE_AFTER_HOURS * 3600
+    text = f"Last reconcile {_ago(ok_at)}"
+    if stale:
+        text += " — it runs hourly, so something is wrong"
+    return {
+        "state": "stale" if stale else "ok",
+        "text": text,
+        # Only worth showing while it is still the current story.
+        "error": (error or None) if stale else None,
+        "error_ago": _ago(error_at) if error and error_at and stale else None,
+    }
 
 
 def _decorate(entries, by_id=None):
@@ -72,6 +116,7 @@ def index():
         render_template("admin.html.j2", visible=visible, hidden=hidden,
                         published=config.PAGE_LIMIT,
                         services=config.MANUAL_SERVICES,
+                        health=_health(),
                         today=datetime.now().astimezone().date().isoformat(),
                         error=request.args.get("error"),
                         notice=request.args.get("notice"))

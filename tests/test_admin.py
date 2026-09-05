@@ -149,6 +149,67 @@ check("a rejected edit changes nothing",
       intact["season"] == 4 and intact["episode_title"] == "Kept")
 check("a rejected edit does not republish", published == [])
 
+# --- reconcile health ------------------------------------------------------
+
+from datetime import timedelta, timezone  # noqa: E402
+from watchlog import plex_history          # noqa: E402
+
+def now(offset_hours=0):
+    return (datetime.now(timezone.utc) + timedelta(hours=offset_hours)).isoformat()
+
+with db.connect() as conn:
+    conn.execute("DELETE FROM meta")
+check("with nothing recorded, health reads as unknown",
+      admin._health()["state"] == "unknown")
+
+# The recording itself: a success clears any standing error, a failure keeps it
+# and still raises so systemd sees a failed unit.
+plex_history._reconcile = lambda days=None, dry_run=False: 0
+plex_history.reconcile()
+check("a successful reconcile records a heartbeat",
+      db.get_meta(plex_history.OK_AT) is not None)
+check("a successful reconcile clears the error",
+      db.get_meta(plex_history.ERROR) == "")
+
+def boom(days=None, dry_run=False):
+    raise ConnectionError("No route to host")
+
+plex_history._reconcile = boom
+raised = False
+try:
+    plex_history.reconcile()
+except ConnectionError:
+    raised = True
+check("a failing reconcile still raises, so systemd marks it failed", raised)
+check("a failing reconcile records why",
+      "No route to host" in (db.get_meta(plex_history.ERROR) or ""))
+
+# What the admin page makes of it.
+db.set_meta(plex_history.OK_AT, now())
+db.set_meta(plex_history.ERROR, "")
+health = admin._health()
+check("a fresh heartbeat reads as ok", health["state"] == "ok")
+check("and says how long ago", "ago" in health["text"] or "just now" in health["text"])
+check("no error is shown while healthy", health["error"] is None)
+
+db.set_meta(plex_history.OK_AT, now(-5))
+db.set_meta(plex_history.ERROR, "ConnectionError: No route to host")
+db.set_meta(plex_history.ERROR_AT, now(-1))
+health = admin._health()
+check("a heartbeat older than the threshold reads as stale",
+      health["state"] == "stale")
+check("stale says plainly that something is wrong",
+      "something is wrong" in health["text"])
+check("stale surfaces the error", "No route to host" in health["error"])
+
+page = client.get("/").get_data(as_text=True)
+check("the stale state renders on the page", "is-stale" in page)
+check("the error text renders too", "No route to host" in page)
+
+db.set_meta(plex_history.OK_AT, now())
+db.set_meta(plex_history.ERROR, "")
+check("recovering clears the warning", admin._health()["state"] == "ok")
+
 # --- the page itself -------------------------------------------------------
 
 page = client.get("/").get_data(as_text=True)
