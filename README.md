@@ -78,6 +78,12 @@ Each row carries a `data-q` attribute holding its searchable text, folded by
 have to agree, so `tests/test_search.py` extracts the template's `fold()` and runs it
 under node against the Python over the same corpus.
 
+The icon in the tab is the site's own space invader, `/assets/si.png`. The page has to
+name it explicitly: the root page's `<link>` uses a relative href, so nothing under
+`/watchlog/` inherits it, and there is no `/favicon.ico` at the root to fall back to. The
+href here is root-relative for the same reason — pointing at the shared file rather than
+a copy, so the log follows if the site ever changes its icon.
+
 ### The admin page
 
 Private to the LAN and the Tailnet, 404s without its token, never exposed to the

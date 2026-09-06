@@ -360,3 +360,20 @@ RISKS AND OPEN QUESTIONS
 
     The admin page now also shows what each entry resolved to. Without that the feature is
     unusable -- there was no way to see a wrong match from the place you would fix it.
+
+20. The page had no favicon. Adam noticed the site's space invader was missing from the
+    log. The cause was not an omission here so much as an assumption: the root page names
+    its icon with a RELATIVE href, assets/si.png, so it resolves only for pages at the
+    root. Nothing under /watchlog/ inherits it, and there is no /favicon.ico at the root
+    for a browser to fall back to -- so the log asked for a file that 404s and got no
+    icon.
+
+    Fixed with one root-relative <link> in the template. Root-relative rather than
+    relative because /watchlog/assets/si.png does not exist, and pointing at the shared
+    file rather than a copy so the log follows if the site changes its icon. The trade is
+    a dependency on the site's asset layout, which is the right way round: one file, one
+    icon, and a broken link would be visible on the site itself first.
+
+    The test asserts the exact root-relative string, since a relative href would still
+    look correct in the template and fail only in production.
+

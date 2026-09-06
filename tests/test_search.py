@@ -127,6 +127,12 @@ check("the box ships hidden, so no-JavaScript never sees a dead input",
 check("the script is inline, like everything else on this page",
       "<script>" in html and "src=" not in html.split("<script>")[1][:200])
 
+# Root-relative, not "assets/si.png": the page lives at /watchlog/, where a
+# relative href would resolve to /watchlog/assets/si.png and 404. That is the
+# exact mistake this line exists to prevent from coming back.
+check("the icon points at the site's own, from a subdirectory",
+      '<link rel="icon" href="/assets/si.png">' in html)
+
 
 # --- the two folds have to agree -------------------------------------------
 
