@@ -102,6 +102,24 @@ RAIL_MAX_TICKS = 300
 # comfortably longer than that goes unnoticed, and costs one page of history.
 RECONCILE_DAYS = 7
 
+# The library sweep reads every watched item in Plex, not just recent plays, so
+# it is the only thing that can see an episode *marked* watched rather than
+# played -- which creates no session and therefore never reaches the history
+# endpoint reconcile reads. It costs a full library listing, and the gap it
+# closes appears in ones and twos, so it runs daily rather than hourly.
+SWEEP_EVERY_HOURS = 24
+
+# How far back the sweep will reach. Left blank it stops at the log's own first
+# event, which is the honest default: the log claims to cover from that day
+# onwards, so filling gaps inside that era is repair, and importing what came
+# before it is a different decision entirely.
+#
+# It matters more than it looks. Plex's play history is trimmed over time but
+# its library remembers viewCount forever, so an unbounded sweep does not find
+# "a few marked episodes" -- it finds every play Plex has since forgotten the
+# session for, going back years.
+SWEEP_SINCE = _get("WATCHLOG_SWEEP_SINCE", "")
+
 # The timer runs hourly, so anything past this means it has missed a turn and
 # the admin page should say so in red rather than stay quietly reassuring.
 RECONCILE_STALE_AFTER_HOURS = 2
@@ -132,6 +150,10 @@ META_PUBLISH_ERROR_AT = "publish_error_at"
 META_WEBHOOK_OK = "webhook_ok_at"
 META_WEBHOOK_MISSED_AT = "webhook_missed_at"
 META_WEBHOOK_MISSED = "webhook_missed_count"
+
+META_SWEEP_OK = "sweep_ok_at"
+META_SWEEP_FOUND = "sweep_found_count"
+META_SWEEP_FOUND_AT = "sweep_found_at"
 
 # Episode titles are listed for a night up to this many episodes, then withheld
 # so a long binge doesn't turn one scannable line into a paragraph. Measured

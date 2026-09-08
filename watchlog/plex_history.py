@@ -208,6 +208,160 @@ def backfill(dry_run=False):
     return inserted
 
 
+# --- the library sweep ------------------------------------------------------
+#
+# Plex has two records of what has been watched and they do not agree. The play
+# HISTORY is a list of sessions, which is what the webhook reports and what
+# reconcile re-reads. The LIBRARY carries viewCount and lastViewedAt per item,
+# and marking a season watched in the UI sets those without ever creating a
+# session. So an episode can be watched in Plex and absent from every source
+# this project otherwise reads -- with nothing anywhere reporting a problem,
+# because nothing went wrong.
+#
+# The timestamp is therefore a mark time, not a watch time. Five episodes
+# marked in one click all land within the same minute. That is a real loss of
+# fidelity and it is still much better than the alternative, which is the log
+# saying a show was abandoned when it was finished.
+
+LIBRARY_TYPE = {"movie": 1, "episode": 4}
+
+
+def _sections():
+    return _get("/library/sections").get("Directory", [])
+
+
+def _library_items(section_key, kind):
+    """Every item of one kind in one section, paginated."""
+    start = 0
+    while True:
+        container = _get(
+            f"/library/sections/{section_key}/all",
+            type=LIBRARY_TYPE[kind],
+            **{"X-Plex-Container-Start": start, "X-Plex-Container-Size": PAGE_SIZE},
+        )
+        items = container.get("Metadata", [])
+        if not items:
+            return
+        yield from items
+        start += len(items)
+        if start >= int(container.get("totalSize", 0)):
+            return
+
+
+def _as_history_row(item):
+    """A library item, wearing the shape `to_event` reads.
+
+    Two differences to bridge. Library items date themselves with lastViewedAt
+    rather than viewedAt, and they carry grandparentRatingKey directly where a
+    history row only has the path in grandparentKey -- so the path is rebuilt
+    here rather than teaching `_rating_key` a second shape.
+    """
+    row = dict(item)
+    row["viewedAt"] = item.get("lastViewedAt")
+    parent = item.get("grandparentRatingKey")
+    if parent and not row.get("grandparentKey"):
+        row["grandparentKey"] = f"/library/metadata/{parent}"
+    return row
+
+
+def watched_in_library():
+    """Every watched item Plex's library knows about, as history-shaped rows.
+
+    No account filter: viewCount and lastViewedAt are returned for the user
+    whose token this is, which is already the right person.
+    """
+    for section in _sections():
+        kind = {"movie": "movie", "show": "episode"}.get(section.get("type"))
+        if not kind:
+            continue
+        for item in _library_items(section["key"], kind):
+            if int(item.get("viewCount") or 0) < 1:
+                continue
+            if not item.get("lastViewedAt"):
+                continue
+            yield _as_history_row(item)
+
+
+def _sweep_due():
+    """Whether a day has passed since the last sweep."""
+    from datetime import datetime, timedelta, timezone
+    last = db.get_meta(config.META_SWEEP_OK)
+    if not last:
+        return True
+    try:
+        when = datetime.fromisoformat(last)
+    except ValueError:
+        return True
+    return datetime.now(timezone.utc) - when >= timedelta(
+        hours=config.SWEEP_EVERY_HOURS)
+
+
+def sweep(dry_run=False, accept=None):
+    """Import what the library says was watched and the history never saw.
+
+    Only fills holes. An item whose dedup key is already in the log is left
+    alone whatever its timestamps say -- the point is the episodes that are
+    missing entirely, and matching on the key rather than on time is what stops
+    this turning every rewatch into a duplicate.
+
+    `accept` is a set of titles to take as visible entries; anything else found
+    is imported hidden. That is not a half-measure, it is the only way to say
+    no permanently: a show left out entirely is offered again tomorrow and
+    every day after, whereas a hidden row is a decision the sweep already
+    respects -- it never resurrects one -- and one the admin page can undo.
+    Marking a whole series watched for someone else's benefit is a real thing
+    people do to a Plex library, and it is not viewing.
+
+    None accepts everything, which is the right default once a library has
+    stopped being seeded.
+    """
+    _account()                       # for the PLEX_TOKEN check and db.init()
+    known = db.dedup_keys()
+    # Plex sends its own spelling of every title, so without this a sweep would
+    # quietly undo a rename -- 24 episodes of "INVINCIBLE (2021)" walking back
+    # in the day after it was corrected to "Invincible (2021)".
+    spellings = db.title_spellings()
+    floor = config.SWEEP_SINCE or db.first_event_date() or ""
+    log.info("sweeping the library back to %s", floor or "the beginning")
+    cache = {}
+    seen = found = skipped_old = dismissed = 0
+    for row in watched_in_library():
+        seen += 1
+        event = to_event(row, cache)
+        if event is None or event["dedup_key"] in known:
+            continue
+        # Older than the log itself. Not a gap -- the log never claimed to
+        # cover it, and importing it silently would rewrite what this page is.
+        if floor and event["watched_at"][:10] < floor:
+            skipped_old += 1
+            continue
+        # Marked, not played -- and said so, because the timestamp on these is
+        # when the box was ticked and anything reading the row should know.
+        event["source"] = "plex-sweep"
+        event["title"] = spellings.get(normalize(event["title"]), event["title"])
+        wanted = accept is None or normalize(event["title"]) in accept
+        event["hidden"] = 0 if wanted else 1
+        found += wanted
+        dismissed += not wanted
+        known.add(event["dedup_key"])
+        log.info("%s%s %s S%sE%s, marked watched %s",
+                 "would " if dry_run else "",
+                 "import" if wanted else "dismiss",
+                 event["title"], event["season"], event["episode"],
+                 event["watched_at"][:10])
+        if not dry_run:
+            db.insert_event(event)
+
+    log.info("library sweep: %d watched items, %d imported, %d dismissed, "
+             "%d older than the log itself", seen, found, dismissed, skipped_old)
+    if not dry_run:
+        db.set_meta(config.META_SWEEP_OK, _now())
+        if found:
+            db.set_meta(config.META_SWEEP_FOUND, str(found))
+            db.set_meta(config.META_SWEEP_FOUND_AT, _now())
+    return found
+
+
 OK_AT = config.META_RECONCILE_OK
 ERROR = config.META_RECONCILE_ERROR
 ERROR_AT = config.META_RECONCILE_ERROR_AT
@@ -282,11 +436,23 @@ def _reconcile(days=None, dry_run=False):
         log.exception("season refresh failed; publishing anyway")
         learned = 0
 
-    if inserted or learned:
+    # And once a day, the thing neither sensor nor history can see. Daily
+    # rather than hourly because it reads the whole library, and because an
+    # episode marked watched rather than played is in no hurry.
+    swept = 0
+    try:
+        if _sweep_due():
+            swept = sweep()
+            if swept:
+                enrich.enrich_pending()
+    except Exception:
+        log.exception("library sweep failed; publishing anyway")
+
+    if inserted or learned or swept:
         render.write_output()
         publish.push()
-        log.info("published: %d recovered event(s), %d show(s) re-measured",
-                 inserted, learned)
+        log.info("published: %d recovered, %d show(s) re-measured, %d swept",
+                 inserted, learned, swept)
 
     return inserted
 
@@ -296,7 +462,15 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     dry = "--dry-run" in sys.argv
-    if "--reconcile" in sys.argv:
+    if "--sweep" in sys.argv:
+        # --only "A|B" takes those titles as real entries and dismisses the
+        # rest into the deleted list, where they stop being offered daily.
+        accept = None
+        for arg in sys.argv:
+            if arg.startswith("--only="):
+                accept = {normalize(t) for t in arg.split("=", 1)[1].split("|")}
+        sweep(dry_run=dry, accept=accept)
+    elif "--reconcile" in sys.argv:
         days = None
         for arg in sys.argv:
             if arg.startswith("--days="):

@@ -161,7 +161,7 @@ def _webhook_beat():
 
 
 def _health():
-    """The chain, in order: both sensors, the safety net, the way out."""
+    """The chain, in order: both sensors, both safety nets, the way out."""
     return [
         _webhook_beat(),
         _beat("Apple TV listener polled", config.META_APPLETV_OK,
@@ -169,6 +169,11 @@ def _health():
         _beat("Last reconcile", config.META_RECONCILE_OK,
               config.RECONCILE_STALE_AFTER_HOURS * 3600, "it runs hourly",
               config.META_RECONCILE_ERROR, config.META_RECONCILE_ERROR_AT),
+        # Given twice the cadence before it counts as late: it rides on the
+        # reconcile timer, so one skipped hour would otherwise show up here as
+        # a second alarm saying the same thing.
+        _beat("Last library sweep", config.META_SWEEP_OK,
+              config.SWEEP_EVERY_HOURS * 2 * 3600, "it runs daily"),
         # No cadence: publishing happens when something changes, so a quiet
         # week is not a fault. Only a failed attempt is.
         _beat("Last publish", config.META_PUBLISH_OK, None, None,

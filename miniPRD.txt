@@ -488,3 +488,33 @@ RISKS AND OPEN QUESTIONS
     now. Sport has no seasons, no episodes and no natural end, and would need its own
     rules before it belonged on a page built around all three.
 
+25. The library sweep, and what running it first revealed.
+
+    Built to close blind spot three from item 24. The dry run immediately showed the idea
+    was bigger than the case that prompted it: Plex's play history holds 282 rows, its
+    library reports 784 watched items. History is trimmed over time; viewCount is forever.
+    So the sweep does not find "a few marked episodes", it finds every play Plex has since
+    forgotten the session for, back to 2021.
+
+    Hence the floor, defaulting to the log's own first event. Repairing a gap inside the
+    era the log claims to cover is one thing; importing four years of prehistory is a
+    different decision and should have to be asked for.
+
+    That left 166 items in 16 clusters, and the clusters told the story: Mr. Robot (45)
+    and The Americans (13) marked on the same day, INVINCIBLE S1-S3 (24) marked in May
+    while S4 was being watched weekly. Adam confirmed it -- shows added to the server for
+    family and friends, marked watched because he had seen them years earlier. Not
+    viewing. Importing them would have put Mr. Robot on the page as July 2026.
+
+    So `accept` exists. What is not accepted is imported HIDDEN rather than skipped,
+    because skipping is not a decision -- the daily run would offer the same 157 items
+    again tomorrow and every day after. A hidden row is already a thing the sweep respects
+    (it never resurrects one) and already something the admin page can undo. No new
+    concept was needed, which is the sign it was the right one.
+
+    Also caught before it happened: the sweep would have undone the rename from item 23.
+    Plex sends its own spelling on every row, so 24 episodes of INVINCIBLE (2021) would
+    have walked back in the day after the correction. Incoming events now adopt whatever
+    spelling the log already uses for that normalised title, which protects the webhook's
+    imports too and not just the sweep's.
+

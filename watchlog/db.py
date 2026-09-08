@@ -329,6 +329,42 @@ def seasons_checked_at():
             "SELECT imdb_id, MAX(updated_at) AS checked FROM seasons GROUP BY imdb_id")}
 
 
+def first_event_date():
+    """The date of the earliest event, or None when the log is empty."""
+    with connect() as conn:
+        row = conn.execute("SELECT MIN(watched_at) AS first FROM events").fetchone()
+    return row["first"][:10] if row and row["first"] else None
+
+
+def title_spellings():
+    """{normalised title: the spelling the log already uses}, most common wins.
+
+    Plex sends its own metadata title on every row, so an incoming event will
+    happily reintroduce a spelling that was corrected by hand -- the rename
+    fixes what is stored, and the next import puts it straight back. This is
+    how something arriving later learns what the log already settled on.
+    """
+    from collections import Counter, defaultdict
+    from .grouping import normalize
+    counts = defaultdict(Counter)
+    with connect() as conn:
+        for row in conn.execute("SELECT title, COUNT(*) n FROM events GROUP BY title"):
+            counts[normalize(row["title"])][row["title"]] += row["n"]
+    return {key: names.most_common(1)[0][0] for key, names in counts.items()}
+
+
+def dedup_keys():
+    """Every dedup key in the log, hidden rows included.
+
+    Hidden ones matter most: they are the entries that were deliberately
+    deleted, and a sweep that re-imported them would undo that quietly and
+    keep doing it every day.
+    """
+    with connect() as conn:
+        return {r["dedup_key"] for r in
+                conn.execute("SELECT DISTINCT dedup_key FROM events")}
+
+
 def set_hidden(event_ids, hidden=True):
     with connect() as conn:
         conn.executemany(

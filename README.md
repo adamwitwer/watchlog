@@ -284,6 +284,25 @@ Three blind spots, and they are different from each other:
   Five episodes of one show were found this way, all "viewed" within sixty seconds of each
   other on a Sunday afternoon.
 
+The **library sweep** closes the third one. It reads `viewCount` from the library rather
+than sessions from the history, and imports what is missing — with the timestamp being
+when the box was ticked rather than when the thing was watched, which is a real loss of
+fidelity and still better than the log calling a finished show abandoned. Those rows carry
+`source = plex-sweep` so they can always be told apart. It runs daily from the reconcile
+timer, since a full library listing is not worth doing hourly.
+
+Two things bound it, both learned by running it:
+
+- **It stops at the log's first event.** Plex trims its play history but keeps `viewCount`
+  forever, so an unbounded sweep finds not a few marked episodes but every play Plex has
+  forgotten the session for — 383 of them here, back to 2021. `WATCHLOG_SWEEP_SINCE`
+  moves the floor if that is ever wanted.
+- **Declining is recorded, not implied.** Marking a whole series watched for the benefit
+  of family or friends is a normal thing to do to a Plex library, and it is not viewing.
+  Anything the sweep is told not to take is imported *hidden* — a decision the sweep
+  already respects, since it never resurrects a hidden row, and one the admin page can
+  undo. Leaving it out instead would mean being offered it again every day forever.
+
 ## Known limits
 
 - **Netflix has no automatic path.** Not a design choice: the Apple TV reports no metadata
