@@ -98,9 +98,9 @@ def _json_entry(entry):
 def build_json():
     """The whole log as one JSON document.
 
-    Small enough to stay one document -- a year of watching is about 26KB, and
-    roughly 10:1 compressible like the page -- so there is no paging, no query
-    string, and nothing to keep in sync. A reader fetches it and has everything.
+    Small enough to stay one document -- a year of watching is 58KB, 8.5KB
+    gzipped -- so there is no paging, no query string, and nothing to keep in
+    sync. A reader fetches it and has everything.
     """
     entries = _entries()
     payload = {

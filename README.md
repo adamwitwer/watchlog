@@ -87,8 +87,8 @@ published by the same rsync that publishes the page, so the two cannot drift apa
 
 It exists so something can *ask questions* of the log rather than read it: which shows in
 Q1, how many films this year, when a series was last touched. The whole thing is one
-document — about 26KB, roughly 10:1 compressible like the page — so there is no paging and
-no query string. A reader fetches it once and has everything.
+document — 58KB, 8.5KB gzipped over the wire — so there is no paging and no query string.
+A reader fetches it once and has everything.
 
 The unit is the display entry, not the raw event: a night of five episodes is one thing
 that happened, and it is what the page draws one line for. Each entry carries the local

@@ -381,7 +381,8 @@ RISKS AND OPEN QUESTIONS
     macOS and iOS Claude apps -- and asked whether an MCP connector was the way. It is,
     eventually, but the feed comes first and does most of the work on its own: with it,
     any model that can fetch a URL can answer "which shows did I watch in Q1 2026". The
-    log is ~26KB of JSON, so the whole thing fits in a context window with room to spare.
+    log is 58KB of JSON (8.5KB gzipped, ~15K tokens), so the whole thing fits in a context
+    window with room to spare.
     There is no query power to add here, only convenience.
 
     The unit is the display entry, not the raw event. A night of five episodes is one
