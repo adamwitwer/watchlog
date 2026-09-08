@@ -377,3 +377,28 @@ RISKS AND OPEN QUESTIONS
     The test asserts the exact root-relative string, since a relative href would still
     look correct in the template and fail only in production.
 
+21. A JSON feed beside the page. Adam wants to query the log from a chat interface -- the
+    macOS and iOS Claude apps -- and asked whether an MCP connector was the way. It is,
+    eventually, but the feed comes first and does most of the work on its own: with it,
+    any model that can fetch a URL can answer "which shows did I watch in Q1 2026". The
+    log is ~26KB of JSON, so the whole thing fits in a context window with room to spare.
+    There is no query power to add here, only convenience.
+
+    The unit is the display entry, not the raw event. A night of five episodes is one
+    thing that happened; that is what the page draws and what a person means. season and
+    episode_count are broken out beside the "S3 E4-E6" label so a reader never has to
+    parse English back into numbers, and both are null on a film -- null rather than 1,
+    because a 1 invites something downstream to sum it.
+
+    `date` is the local date, matching what the page prints. Filtering on the UTC
+    timestamp would drop a late-night film into the wrong quarter, which is exactly the
+    kind of wrong answer that looks right.
+
+    render.write_page became render.write_output. It writes two files now, and a
+    write_page that quietly also wrote a feed is the kind of thing you discover only when
+    the feed goes stale and nothing says why.
+
+    Nothing new is public: every field was already on the page. The feed is a different
+    shape of the same disclosure, which is what makes the MCP server that reads it able to
+    live outside the house without the Pi ever being reachable from it.
+

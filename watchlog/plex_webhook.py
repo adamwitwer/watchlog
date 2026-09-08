@@ -93,7 +93,7 @@ def schedule_publish():
 
 def _publish_now():
     try:
-        render.write_page()
+        render.write_output()
         publish.push()
     except Exception:
         log.exception("publish failed")

@@ -25,7 +25,7 @@ from watchlog.grouping import night_of  # noqa: E402
 
 published, enriched = [], []
 _real_push = admin.publish.push        # the stub below replaces it globally
-admin.render.write_page = lambda: published.append("render")
+admin.render.write_output = lambda: published.append("render")
 admin.publish.push = lambda: published.append("push")
 admin.enrich.enrich_pending = lambda: enriched.append(1)
 

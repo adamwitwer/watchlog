@@ -60,9 +60,14 @@ def _push(local_path=None):
     )
     ssh_cmd = f"ssh -i {config.NFSN_SSH_KEY} -o StrictHostKeyChecking=accept-new"
 
-    # The page, and the .htaccess that keeps the host's edge cache from
-    # serving a stale copy for a quarter of an hour after every publish.
+    # The page, the JSON feed beside it, and the .htaccess that keeps the
+    # host's edge cache from serving a stale copy for a quarter of an hour
+    # after every publish.
     transfers = [(local, "index.html")]
+    # Guarded rather than assumed: an `out/` written by an older revision has
+    # no feed in it, and a missing file should not take the page down with it.
+    if config.JSON_PATH.exists():
+        transfers.append((config.JSON_PATH, "watchlog.json"))
     htaccess = config.ROOT / "web" / ".htaccess"
     if htaccess.exists():
         transfers.append((htaccess, ".htaccess"))

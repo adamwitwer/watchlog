@@ -45,18 +45,29 @@ def format_episodes(numbers):
     )
 
 
+def single_season(rows):
+    """The season number when a night sits in exactly one, else None.
+
+    The label already says "S2" in its own string, but a machine reading the
+    JSON feed should not have to parse English out of it. A night that spans a
+    season boundary genuinely has no single answer, and says so.
+    """
+    seasons = {r["season"] for r in rows if r["season"] is not None}
+    return seasons.pop() if len(seasons) == 1 else None
+
+
 def episode_label(rows):
     """'S2 E3-E6' when we know the numbers, None when we don't.
 
     Apple TV+ entries have no season or episode data at all -- the device
     reports the series and nothing more -- so those simply carry no label.
     """
-    seasons = {r["season"] for r in rows if r["season"] is not None}
     episodes = [r["episode"] for r in rows if r["episode"] is not None]
     if not episodes:
         return None
-    if len(seasons) == 1:
-        return f"S{seasons.pop()} {format_episodes(episodes)}"
+    season = single_season(rows)
+    if season is not None:
+        return f"S{season} {format_episodes(episodes)}"
     return format_episodes(episodes)
 
 
@@ -106,6 +117,7 @@ def group(rows):
                 "service": row["service"],
                 "imdb_id": row["imdb_id"],
                 "media_type": "movie",
+                "season": None,
             })
             continue
 
@@ -124,6 +136,7 @@ def group(rows):
             "service": newest["service"],
             "imdb_id": next((r["imdb_id"] for r in rows_in_bucket if r["imdb_id"]), None),
             "media_type": "episode",
+            "season": single_season(rows_in_bucket),
         })
 
     entries.sort(key=lambda e: e["watched_at"], reverse=True)

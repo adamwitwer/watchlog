@@ -1,12 +1,16 @@
 # Watchlog republishes whenever something is watched, so the edge cache must
 # not hold a stale page. Without this, NearlyFreeSpeech served the previous
-# version for 15+ minutes after a successful publish.
+# version for 15+ minutes after a successful publish. The JSON feed beside the
+# page is rewritten by the same publish and gets the same treatment -- named
+# explicitly rather than left to ExpiresDefault, because a feed that answers
+# questions from a stale copy is worse than a stale page: nothing looks wrong.
 #
 # Both modules are tried: mod_headers alone did not take effect on this host.
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresDefault "access plus 60 seconds"
   ExpiresByType text/html "access plus 60 seconds"
+  ExpiresByType application/json "access plus 60 seconds"
 </IfModule>
 <IfModule mod_headers.c>
   Header set Cache-Control "public, max-age=60, must-revalidate"

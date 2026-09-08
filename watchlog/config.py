@@ -35,6 +35,9 @@ ADMIN_TOKEN = _get("ADMIN_TOKEN", "")
 
 DB_PATH = Path(_get("WATCHLOG_DB", str(ROOT / "watchlog.db")))
 OUT_PATH = Path(_get("WATCHLOG_OUT", str(ROOT / "out" / "watchlog.html")))
+# The same log as data, published beside the page. Anything that wants to ask
+# questions of the log reads this rather than scraping the HTML.
+JSON_PATH = Path(_get("WATCHLOG_JSON", str(ROOT / "out" / "watchlog.json")))
 
 # A "night" rolls over at 4am, so something started at 1am counts with the
 # evening before rather than opening a new day with one stray episode.

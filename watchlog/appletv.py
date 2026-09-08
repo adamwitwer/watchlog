@@ -186,7 +186,7 @@ class Collector:
             # Apple TV entries arrive with only a title, so they are resolved
             # to an IMDb id and year before the page is built.
             enrich.enrich_pending()
-            render.write_page()
+            render.write_output()
             publish.push()
         except Exception:
             log.exception("publish failed")

@@ -38,9 +38,10 @@ web host. The only public surface is that flat file.
 - **Enrichment** — TMDb resolves titles that arrive without ids into IMDb ids and years,
   cached per title. A `locked` flag pins a hand-corrected match so the enricher leaves it
   alone.
-- **Publish** — Jinja2 renders one file; rsync over SSH puts it on NearlyFreeSpeech,
-  alongside an `.htaccess` that stops the host's edge cache serving a stale page for a
-  quarter of an hour after every publish.
+- **Publish** — Jinja2 renders the page and a JSON feed of the same entries; rsync over
+  SSH puts both on NearlyFreeSpeech, alongside an `.htaccess` that stops the host's edge
+  cache serving a stale copy for a quarter of an hour after every publish. `write_output()`
+  writes both files, so neither can be forgotten by a caller.
 
 ### The page
 
@@ -77,6 +78,34 @@ Each row carries a `data-q` attribute holding its searchable text, folded by
 `bobs` finds `Bob's`. The browser folds the typed query the same way. Those two folds
 have to agree, so `tests/test_search.py` extracts the template's `fold()` and runs it
 under node against the Python over the same corpus.
+
+### The feed
+
+The same log, as data, at
+**[adamwitwer.com/watchlog/watchlog.json](https://adamwitwer.com/watchlog/watchlog.json)** —
+published by the same rsync that publishes the page, so the two cannot drift apart.
+
+It exists so something can *ask questions* of the log rather than read it: which shows in
+Q1, how many films this year, when a series was last touched. The whole thing is one
+document — about 26KB, roughly 10:1 compressible like the page — so there is no paging and
+no query string. A reader fetches it once and has everything.
+
+The unit is the display entry, not the raw event: a night of five episodes is one thing
+that happened, and it is what the page draws one line for. Each entry carries the local
+`date` (the same one the page prints, so filtering a quarter needs no reasoning about time
+zones), the raw `watched_at` beside it, `title`, `media_type`, `detail` (`S3 E4-E6`),
+`season` and `episode_count` broken out so nothing has to parse that label back apart,
+`episode_titles`, `year`, `service` and `imdb_id`. Films carry `null` for `season` and
+`episode_count` — a film has no episodes, and saying `1` invites something downstream to
+add them up. A night that crosses a season boundary carries `null` too, because there is
+no single honest answer.
+
+The envelope has a `version`, so a reader can refuse a shape it does not understand rather
+than answer from one it has misread.
+
+Nothing new is exposed: the page has always shown every one of these fields to anyone who
+looked. Hidden entries are excluded from both, because both are built from the same
+`group(db.visible_events())`.
 
 The icon in the tab is the site's own space invader, `/assets/si.png`. The page has to
 name it explicitly: the root page's `<link>` uses a relative href, so nothing under
@@ -164,7 +193,7 @@ Four systemd units on the Pi, all enabled at boot:
 ```
 python -m watchlog.plex_history --reconcile --dry-run   # what the timer would import
 python -m watchlog.render                               # render without publishing
-python -m tests.test_grouping                           # and test_tracker, test_admin
+python -m tests.test_grouping    # and test_admin, test_feed, test_search, test_tracker
 ```
 
 ## Backfill

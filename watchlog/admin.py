@@ -217,7 +217,7 @@ def index():
 
 def _republish():
     try:
-        render.write_page()
+        render.write_output()
         publish.push()
     except Exception:
         log.exception("republish after change failed")

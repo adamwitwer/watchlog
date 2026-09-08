@@ -268,7 +268,7 @@ def _reconcile(days=None, dry_run=False):
             enrich.enrich_pending()
         except Exception:
             log.exception("enrichment failed; publishing anyway")
-        render.write_page()
+        render.write_output()
         publish.push()
         log.info("published %d recovered event(s)", inserted)
 

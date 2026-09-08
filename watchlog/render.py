@@ -1,4 +1,11 @@
-"""Render the visible events into one self-contained HTML file."""
+"""Render the visible events into a self-contained HTML page and a JSON feed.
+
+The page is what a person reads. The feed is the same log as data, for anything
+that wants to ask questions of it rather than look at it -- which today means an
+MCP server, and tomorrow whatever else. They are rendered from one call so the
+two can never disagree about what was watched.
+"""
+import json
 import logging
 import math
 import re
@@ -52,8 +59,65 @@ def _date_label(iso):
     return f"{moment.strftime('%B')} {moment.day}, {moment.year}"
 
 
+def _entries():
+    """The display entries, newest first -- what both outputs are built from."""
+    return group(db.visible_events())[: config.PAGE_LIMIT]
+
+
+def _json_entry(entry):
+    """One display entry, as data.
+
+    Deliberately the grouped entry rather than the raw event: a night of five
+    episodes is one thing that happened, and that is the unit the page counts
+    in too. `detail` is kept because it is exactly what the page prints, but
+    `season` and `episode_count` sit beside it so nothing has to parse "S2
+    E3-E6" back apart to answer a question.
+    """
+    moment = datetime.fromisoformat(
+        entry["watched_at"].replace("Z", "+00:00")
+    ).astimezone()
+    return {
+        # The local date, matching what the page prints. Filtering on the UTC
+        # timestamp instead would put a late-night film in the wrong quarter.
+        "date": moment.date().isoformat(),
+        "watched_at": entry["watched_at"],
+        "media_type": entry["media_type"],
+        "title": entry["title"],
+        "detail": entry["detail"],
+        "season": entry["season"],
+        # Null rather than 1 for a film: a film has no episodes, and saying
+        # "1" invites something downstream to add them up.
+        "episode_count": len(entry["ids"]) if entry["media_type"] == "episode" else None,
+        "episode_titles": entry["episode_names"],
+        "year": entry["year"],
+        "service": entry["service"],
+        "imdb_id": entry["imdb_id"],
+    }
+
+
+def build_json():
+    """The whole log as one JSON document.
+
+    Small enough to stay one document -- a year of watching is about 26KB, and
+    roughly 10:1 compressible like the page -- so there is no paging, no query
+    string, and nothing to keep in sync. A reader fetches it and has everything.
+    """
+    entries = _entries()
+    payload = {
+        # Bump this if a field changes meaning or leaves. Readers can then say
+        # so instead of quietly answering from a shape they no longer understand.
+        "version": 1,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "count": len(entries),
+        "entries": [_json_entry(entry) for entry in entries],
+    }
+    # ensure_ascii=False so "Naïve" stays readable rather than turning into
+    # escapes; the file is served as UTF-8 either way.
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")), len(entries)
+
+
 def build_html():
-    entries = group(db.visible_events())[: config.PAGE_LIMIT]
+    entries = _entries()
 
     # Everything the timeline rail needs: an anchor to jump to, and a flag on
     # the first entry of each month. Entries are newest first, so "first of the
@@ -91,15 +155,25 @@ def build_html():
     return template.render(entries=entries, generated_at=generated), len(entries)
 
 
-def write_page():
+def write_output():
+    """Write both files. Every caller wants both, so neither is optional.
+
+    Named for what it does rather than for the page alone: a `write_page` that
+    quietly also wrote a JSON feed would be the kind of thing you only discover
+    when the feed goes stale and nothing says why.
+    """
     html, count = build_html()
+    feed, _ = build_json()
     config.OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     config.OUT_PATH.write_text(html, encoding="utf-8")
-    log.info("rendered %d entries to %s", count, config.OUT_PATH)
+    config.JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
+    config.JSON_PATH.write_text(feed, encoding="utf-8")
+    log.info("rendered %d entries to %s and %s",
+             count, config.OUT_PATH, config.JSON_PATH)
     return config.OUT_PATH
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     db.init()
-    print(write_page())
+    print(write_output())
