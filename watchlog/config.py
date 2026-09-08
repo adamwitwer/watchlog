@@ -46,6 +46,36 @@ NIGHT_ROLLOVER_HOUR = 4
 # Matches Plex's own media.scrobble trigger, so both sensors agree.
 WATCHED_THRESHOLD = 0.90
 
+# --- reading the log back ----------------------------------------------------
+# What the log can say about a show without anyone rating anything. These
+# thresholds turn "when did he come back" into a label, and every one of them
+# is a judgement call rather than a fact, so they live here where they can be
+# argued with.
+
+# How the pace of a show is described, from the median gap between the nights
+# it was watched on. Below the first number he set the pace himself; inside the
+# weekly band the release schedule set it, and keeping up is the signal.
+DEVOURED_MAX_GAP_DAYS = 2
+WEEKLY_GAP_DAYS = (5, 9)
+
+# One night has no gaps to measure, but three episodes in one sitting is the
+# most devoured thing in the log, not the least. Below this it is just a night.
+BINGE_EPISODES = 3
+
+# A season is called finished at this much of it, not at all of it: a stray
+# unwatched episode is more often a recap or a special than a real gap.
+FINISHED_AT = 0.95
+
+# Quiet for this long with a season unfinished and it is no longer "paused".
+# Deliberately generous -- a mid-season break is normal, and calling something
+# abandoned that he is waiting on is the one wrong answer that would annoy.
+ABANDONED_AFTER_DAYS = 60
+WATCHING_WITHIN_DAYS = 21
+
+# Season lengths come from TMDb and are cached. A running season's count can
+# change as episodes are announced, so rows are re-read after this long.
+SEASONS_REFRESH_DAYS = 7
+
 # Plex records a second view when an episode is finished in a later session,
 # so the same episode arrives twice, typically 8-23 hours apart. Four hours was
 # too narrow to catch that. Genuine rewatches inside two days are rare; the

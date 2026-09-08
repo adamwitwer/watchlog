@@ -283,6 +283,58 @@ def edit():
     return redirect(url_for("index"))
 
 
+@app.post("/rename")
+def rename():
+    """Fix a show or film title.
+
+    The one field on an entry that had no way to be corrected. Sources spell
+    the same show differently and typing it by hand invites typos; either way
+    the result is one show appearing twice -- twice on the page, and split in
+    half by anything that counts episodes.
+
+    Scoped by media_type, not just the normalised key. "Furious" is a 2026
+    series and "The Furious" a 2026 film; normalize() strips the leading
+    article that tells them apart, so a key-only rename would quietly rename
+    the film too.
+    """
+    if not _authorised():
+        return "Not found", 404
+
+    try:
+        old_title = (request.form.get("title") or "").strip()
+        new_title = (request.form.get("new_title") or "").strip()[:200]
+        media_type = request.form.get("media_type") or ""
+        if not old_title or not new_title:
+            raise _BadField("a title is required")
+        if new_title == old_title:
+            raise _BadField("that is already the title")
+    except _BadField as exc:
+        log.warning("rejected rename: %s", exc)
+        return redirect(url_for("index", error=str(exc)))
+
+    # Every spelling that shares the normalised key, within this media type --
+    # so "INVINCIBLE (2021)" and "Invincible (2021)" are fixed together, which
+    # is the whole point of doing this from one entry rather than each.
+    key = normalize(old_title)
+    titles = [t for t, kind in db.titled_events(media_type)
+              if normalize(t) == key]
+    changed = db.rename_title(titles, new_title)
+
+    # The enricher caches on the normalised title. If the rename changed that
+    # key, the old row now describes a spelling nothing uses.
+    if normalize(new_title) != key:
+        db.forget_title(key)
+
+    log.info("renamed %r -> %r across %d spelling(s), %d event(s)",
+             old_title, new_title, len(titles), changed)
+    _republish()
+    return redirect(url_for(
+        "index",
+        notice=f"Renamed to {new_title} — {changed} "
+               f"entr{'y' if changed == 1 else 'ies'} updated.",
+    ))
+
+
 # tt plus seven digits, or eight for anything numbered since about 2020.
 IMDB_ID = re.compile(r"^tt\d{7,8}$")
 

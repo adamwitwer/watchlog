@@ -256,21 +256,37 @@ def _reconcile(days=None, dry_run=False):
     log.info("reconcile over %d days: %d rows seen, %d imported, %d already known",
              days, seen, inserted, skipped)
 
-    if inserted and not dry_run:
+    if dry_run:
+        return inserted
+
+    from . import enrich, publish, render
+
+    if inserted:
         # Every row recovered here is a play the webhook should have delivered
         # and didn't. That count, not silence, is the measure of whether the
         # webhook is still doing its job.
         db.set_meta(config.META_WEBHOOK_MISSED, str(inserted))
         db.set_meta(config.META_WEBHOOK_MISSED_AT, _now())
-
-        from . import enrich, publish, render
         try:
             enrich.enrich_pending()
         except Exception:
             log.exception("enrichment failed; publishing anyway")
+
+    # Season lengths drift with no help from us: a season still airing gains
+    # episodes as they are announced, and a show that reached its finale stops
+    # being "in progress" without anything new being watched. So this runs on
+    # every reconcile, not only the ones that found something.
+    try:
+        learned = enrich.refresh_seasons()
+    except Exception:
+        log.exception("season refresh failed; publishing anyway")
+        learned = 0
+
+    if inserted or learned:
         render.write_output()
         publish.push()
-        log.info("published %d recovered event(s)", inserted)
+        log.info("published: %d recovered event(s), %d show(s) re-measured",
+                 inserted, learned)
 
     return inserted
 

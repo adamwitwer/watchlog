@@ -100,6 +100,11 @@ zones), the raw `watched_at` beside it, `title`, `media_type`, `detail` (`S3 E4-
 add them up. A night that crosses a season boundary carries `null` too, because there is
 no single honest answer.
 
+Alongside `entries` is a **`shows`** block: one record per show per season, carrying what
+a reader cannot work out by eye — `pace`, `completion`, `status`, `median_gap_days`,
+`max_gap_days`, `days_since`. That arithmetic runs over every event, so it is done here
+rather than estimated from a list.
+
 The envelope has a `version`, so a reader can refuse a shape it does not understand rather
 than answer from one it has misread.
 
@@ -113,6 +118,39 @@ name it explicitly: the root page's `<link>` uses a relative href, so nothing un
 href here is root-relative for the same reason — pointing at the shared file rather than
 a copy, so the log follows if the site ever changes its icon.
 
+### Ranking, without ratings
+
+Nothing in the log is rated, and it still ranks shows — just not by episode count. Most of
+what gets watched here is weekly-release television, so the count measures *how much has
+aired*: nine shows sitting on exactly eight episodes is a release schedule, not a
+preference.
+
+`stats.py` measures the two things the schedule does not control.
+
+**The gap between nights.** Coming back tomorrow is a choice; coming back in seven days is
+the calendar. A short median gap is `devoured`; five to nine days is `weekly`. Within a
+weekly show the *largest* gap is the interesting one — when it equals the cadence, no
+episode was ever missed; when it is three times the cadence, the show was drifted away
+from and caught up on later. Those look identical on a median.
+
+**Whether the season was finished.** `enrich.refresh_seasons` asks TMDb how many episodes
+each season actually has. Without that, "eight episodes then nothing" is unreadable: it is
+a complete season of one show and a walkout halfway through another, and those are
+opposite facts about the same number.
+
+Which produces a `status` of `finished`, `watching`, `waiting`, `paused` or `abandoned`.
+`waiting` earns its place: a season still airing has an episode count covering episodes
+nobody could have watched yet, so being up to date and having given up look the same. TMDb
+says which seasons are still running, and the log never accuses anyone of abandoning a
+show they are waiting on.
+
+None of it decides what a favourite *is*. It produces the evidence and leaves the ranking
+to whoever asked, because the two cases above mean different things by the word and any
+single score would quietly pick one.
+
+The thresholds are all judgement calls rather than facts, so they live in `config.py`
+where they can be argued with.
+
 ### The admin page
 
 Private to the LAN and the Tailnet, 404s without its token, never exposed to the
@@ -123,6 +161,11 @@ internet. It can:
 - **edit** season, episode and episode title on any entry backed by a single event, which
   is every Apple TV entry, because the device reports none of the three
 - **add** an entry outright, resolving the IMDb link and year from the title
+- **fix a title** — a show spelled two ways is two shows to anything that counts them, and
+  until this existed the title was the one field on an entry with no way to correct it.
+  Renames every spelling that shares the normalised key, but only within the same media
+  type: `Furious` is a 2026 series and `The Furious` a 2026 film, and `normalize()` strips
+  the leading article that tells them apart
 - **fix a bad match** — TMDb search takes the most popular result, which for an ambiguous
   title ("Dark Matter" is a 2024 Apple TV+ series and a 2015 Syfy one) is sometimes the
   wrong show, and the result is a wrong IMDb link on a public page. Typing the right id

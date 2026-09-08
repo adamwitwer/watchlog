@@ -275,6 +275,23 @@
       </details>
       {% endif %}
       <details class="edit">
+        <summary>Fix the title</summary>
+        <form method="post" action="{{ url_for('rename') }}">
+          <input type="hidden" name="title" value="{{ entry.title }}">
+          <input type="hidden" name="media_type" value="{{ entry.media_type }}">
+          <div class="fields">
+            <input class="name" type="text" name="new_title" maxlength="200"
+                   placeholder="Title" value="{{ entry.title }}">
+            <button type="submit">Save</button>
+            <span class="hint">
+              Renames every spelling of this
+              {{ 'film' if entry.media_type == 'movie' else 'show' }} at once.
+              A title spelled two ways is two shows to anything that counts them.
+            </span>
+          </div>
+        </form>
+      </details>
+      <details class="edit">
         <summary>Fix the IMDb match</summary>
         <form method="post" action="{{ url_for('match') }}">
           <input type="hidden" name="title" value="{{ entry.title }}">

@@ -420,6 +420,74 @@ response = client.post("/match", data={"title": "The Wrong Show",
 check("fixing a match 404s without a token", response.status_code == 404)
 client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
 
+# --- renaming a show --------------------------------------------------------
+# A show spelled two ways is two shows to anything that counts them. The fix
+# has to reach every spelling at once, and must not reach past the media type.
+
+for spelling, day, kind in (
+    ("SPLIT SHOW", "2024-09-01", "episode"),
+    ("Split Show", "2024-11-01", "episode"),
+    # Same normalised key as the show above once the article is stripped, but a
+    # film. Renaming the show must leave this alone.
+    ("The Split Show", "2024-10-01", "movie"),
+):
+    db.insert_event({
+        "watched_at": f"{day}T20:00:00+00:00", "source": "test", "service": "Plex",
+        "media_type": kind, "title": spelling,
+        "episode_title": None, "year": 2024,
+        "season": 1 if kind == "episode" else None,
+        "episode": 1 if kind == "episode" else None,
+        "dedup_key": f"{spelling}|{day}",
+    })
+
+def titles_now():
+    with db.connect() as conn:
+        return sorted(r["title"] for r in conn.execute(
+            "SELECT DISTINCT title FROM events WHERE title LIKE '%plit Show%'"
+            " OR title LIKE '%PLIT SHOW%'"))
+
+check("the log starts with the show spelled two ways, plus a film",
+      titles_now() == ["SPLIT SHOW", "Split Show", "The Split Show"])
+
+published.clear()
+client.post("/rename", data={"title": "SPLIT SHOW", "new_title": "Split Show",
+                             "media_type": "episode"})
+check("both spellings of the show collapse into one",
+      titles_now() == ["Split Show", "The Split Show"])
+check("the film that shares the normalised key is untouched",
+      "The Split Show" in titles_now())
+check("renaming republishes", published == ["render", "push"])
+
+client.post("/rename", data={"title": "Split Show", "new_title": "Split Show",
+                             "media_type": "episode"})
+check("renaming to the same title is refused rather than counted as a change",
+      titles_now() == ["Split Show", "The Split Show"])
+
+client.post("/rename", data={"title": "Split Show", "new_title": "",
+                             "media_type": "episode"})
+check("an empty title is refused", titles_now() == ["Split Show", "The Split Show"])
+
+# A typo does not normalise to the thing it was meant to be, so it can only
+# ever rename itself -- which is exactly right.
+db.insert_event({
+    "watched_at": "2024-12-01T20:00:00+00:00", "source": "test", "service": "Plex",
+    "media_type": "episode", "title": "Spilt Show", "episode_title": None,
+    "year": 2024, "season": 1, "episode": 9, "dedup_key": "typo|2024-12-01",
+})
+client.post("/rename", data={"title": "Spilt Show", "new_title": "Split Show",
+                             "media_type": "episode"})
+with db.connect() as conn:
+    gone = conn.execute(
+        "SELECT COUNT(*) n FROM events WHERE title = 'Spilt Show'").fetchone()["n"]
+check("a typo can be renamed even though it normalises to nothing else", gone == 0)
+
+client.delete_cookie("watchlog_admin")
+response = client.post("/rename", data={"title": "Split Show",
+                                        "new_title": "Nope", "media_type": "episode"})
+check("renaming 404s without a token", response.status_code == 404)
+client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
+
+
 # --- the page itself -------------------------------------------------------
 
 page = client.get("/").get_data(as_text=True)
@@ -428,6 +496,7 @@ check("the service suggestions are offered", "Prime Video" in page)
 check("the date defaults to today",
       datetime.now().astimezone().date().isoformat() in page)
 check("the match form is rendered", 'action="/match"' in page)
+check("the rename form is rendered", 'action="/rename"' in page)
 check("each entry shows what it resolved to", "no IMDb match" in page
       or "imdb.com/title/" in page)
 check("the edit form is offered for single-event entries",

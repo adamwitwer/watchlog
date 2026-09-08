@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from . import config, db
+from . import config, db, stats
 from .grouping import group
 
 log = logging.getLogger("watchlog.render")
@@ -106,10 +106,16 @@ def build_json():
     payload = {
         # Bump this if a field changes meaning or leaves. Readers can then say
         # so instead of quietly answering from a shape they no longer understand.
-        "version": 1,
+        "version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "count": len(entries),
         "entries": [_json_entry(entry) for entry in entries],
+        # The same events, aggregated per show per season: pace, completion,
+        # how long since. Precomputed because it is the part a reader would get
+        # wrong by eye -- median gaps and completion rates are arithmetic over
+        # every event, not something to be estimated from a list. What counts
+        # as a favourite is still left to whoever asked.
+        "shows": stats.show_seasons(),
     }
     # ensure_ascii=False so "Naïve" stays readable rather than turning into
     # escapes; the file is served as UTF-8 either way.

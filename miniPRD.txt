@@ -403,3 +403,50 @@ RISKS AND OPEN QUESTIONS
     shape of the same disclosure, which is what makes the MCP server that reads it able to
     live outside the house without the Pi ever being reachable from it.
 
+22. Ranking shows without rating them. Adam asked for a way to see his favourites of the
+    year. The first thing worth knowing is that the obvious metric is useless here: rank
+    2026 by episode count and the answer is nine shows tied on eight, because almost
+    everything he watches is weekly and the count measures how much has aired.
+
+    Two signals the release schedule does not control:
+
+    Gap between nights. Coming back tomorrow is a choice, coming back in seven days is the
+    calendar. Median gap separates devoured from weekly. Inside the weekly group the MAX
+    gap is the better signal -- Invincible never slipped past 7 days, Industry once went
+    22. Same episode count, same cadence, different relationship to the show.
+
+    Completion, which needs TMDb season lengths. "Eight episodes then nothing" is a
+    finished season of one show and a walkout from another; those are opposite facts about
+    the same number. 18 seasons finished in 2026, 5 abandoned.
+
+    The trap, found by running it on real data before shipping: Vox Machina S4 read as
+    "devoured, then abandoned" at 7/12. That is either giving up or being up to date on a
+    show still airing, and calling the second one abandoned is the single most annoying
+    wrong answer this could give. TMDb's next_episode_to_air says which, so there is a
+    "waiting" status now. Vox Machina turned out to be genuinely abandoned -- that season
+    finished airing -- but nine other seasons are marked airing and would have been
+    accused wrongly.
+
+    Deliberately no single "favourite" score. Devoured and weekly-and-never-missed are
+    both favourites and they are not commensurable; any one number would quietly pick a
+    definition. The feed carries the evidence and whoever asked does the ranking.
+
+    All the thresholds are judgement calls, so they sit in config.py rather than being
+    buried as literals.
+
+23. Renaming a show from the admin page. Found while doing 22: INVINCIBLE (2021) and
+    Invincible (2021) were two shows to anything counting episodes, and the title was the
+    only field on an entry with no way to fix it. Scoped by media_type as well as the
+    normalised key, because Furious is a 2026 series and The Furious a 2026 film and
+    normalize() strips exactly the article that separates them -- a key-only rename would
+    have renamed the film too.
+
+    The same collision is a latent bug in the titles cache, which is keyed on the
+    normalised title alone. Nothing has been hit by it yet because both of those arrived
+    from Plex with ids attached. Left alone for now, noted here.
+
+    Also added the first schema migration this project has needed. CREATE TABLE IF NOT
+    EXISTS does nothing when the table already exists, so the airing column would never
+    have appeared on a database written an hour earlier -- and would have failed at query
+    time, long after the deploy looked fine.
+

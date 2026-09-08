@@ -3,10 +3,13 @@
 One row per watch event. Grouping into what the page displays happens at render
 time, not here, so the grouping rules can change without touching the record.
 """
+import logging
 import sqlite3
 from contextlib import contextmanager
 
 from . import config
+
+log = logging.getLogger("watchlog.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -40,6 +43,24 @@ CREATE TABLE IF NOT EXISTS meta (
     updated_at  TEXT
 );
 
+-- How many episodes each season of a show actually has, from TMDb. Without it
+-- "eight episodes then nothing" is unreadable: it could be a season finished
+-- or a show abandoned halfway, and those are opposite facts about the same
+-- number. Keyed on the IMDb id rather than the title, which is neither stable
+-- nor unique.
+CREATE TABLE IF NOT EXISTS seasons (
+    imdb_id       TEXT    NOT NULL,
+    season        INTEGER NOT NULL,
+    episode_count INTEGER,
+    -- Whether TMDb still has an unaired episode scheduled for this season.
+    -- Without it a season watched to the last released episode is
+    -- indistinguishable from one walked out on, and the log would accuse him
+    -- of abandoning a show he is up to date with.
+    airing        INTEGER NOT NULL DEFAULT 0,
+    updated_at    TEXT,
+    PRIMARY KEY (imdb_id, season)
+);
+
 -- Resolved metadata, cached so each show is looked up once. Manual overrides
 -- live here too: set locked=1 and the enricher will leave the row alone.
 CREATE TABLE IF NOT EXISTS titles (
@@ -65,9 +86,25 @@ def connect():
         conn.close()
 
 
+# Columns added to a table that already exists somewhere. CREATE TABLE IF NOT
+# EXISTS does nothing at all when the table is present, so a column added later
+# has to be asked for separately -- otherwise a database written by an older
+# revision keeps the old shape and every query naming the column fails at the
+# moment it runs, which is long after the deploy that looked fine.
+ADDED_COLUMNS = [
+    ("seasons", "airing", "INTEGER NOT NULL DEFAULT 0"),
+]
+
+
 def init():
     with connect() as conn:
         conn.executescript(SCHEMA)
+        for table, column, spec in ADDED_COLUMNS:
+            present = {r["name"] for r in
+                       conn.execute(f"PRAGMA table_info({table})")}
+            if present and column not in present:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {spec}")
+                log.info("added %s.%s to an existing database", table, column)
 
 
 def set_meta(key, value):
@@ -161,6 +198,52 @@ def event_titles():
                 conn.execute("SELECT DISTINCT title FROM events").fetchall()]
 
 
+def titled_events(media_type=None):
+    """Distinct (title, media_type) pairs, hidden rows included.
+
+    The pair, not the title alone: a normalised title is not unique across
+    media types. "Furious" is a 2026 series and "The Furious" a 2026 film, and
+    normalize() strips the leading article that separates them.
+    """
+    sql = "SELECT DISTINCT title, media_type FROM events"
+    args = []
+    if media_type:
+        sql += " WHERE media_type = ?"
+        args.append(media_type)
+    with connect() as conn:
+        return [(r["title"], r["media_type"]) for r in conn.execute(sql, args)]
+
+
+def rename_title(titles, new_title):
+    """Point a set of spellings at one canonical title.
+
+    Renaming is not cosmetic. A show spelled two ways is two shows to anything
+    that counts them -- the page prints both, and a ranking splits its episodes
+    between them. The caller decides which spellings belong together; this only
+    writes. Returns the row count.
+    """
+    if not titles:
+        return 0
+    with connect() as conn:
+        placeholders = ", ".join("?" for _ in titles)
+        cursor = conn.execute(
+            f"UPDATE events SET title = ? WHERE title IN ({placeholders})",
+            [new_title, *titles],
+        )
+        return cursor.rowcount
+
+
+def forget_title(norm_title):
+    """Drop a cached resolution whose key no longer matches any event.
+
+    After a rename the old normalised key is orphaned. Left behind it is a
+    mapping from a spelling nothing uses any more, which is harmless until
+    something spells it that way again and gets the stale answer.
+    """
+    with connect() as conn:
+        conn.execute("DELETE FROM titles WHERE norm_title = ?", (norm_title,))
+
+
 def set_title_match(norm_title, imdb_id, tmdb_id, year):
     """Pin what a title resolves to, by hand.
 
@@ -200,6 +283,50 @@ def update_identity(titles, imdb_id, tmdb_id, year):
             [imdb_id, tmdb_id, year, *titles],
         )
         return cursor.rowcount
+
+
+def season_lengths():
+    """{(imdb_id, season): episode_count} for everything already looked up."""
+    with connect() as conn:
+        return {(r["imdb_id"], r["season"]): r["episode_count"]
+                for r in conn.execute(
+                    "SELECT imdb_id, season, episode_count FROM seasons")}
+
+
+def set_season_lengths(imdb_id, counts, airing_season=None):
+    """Record how long each season of one show is. counts: {season: episodes}.
+
+    airing_season is the one TMDb still has an unaired episode scheduled for,
+    if any -- the difference between "up to date" and "gave up".
+    """
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    with connect() as conn:
+        conn.executemany(
+            """INSERT INTO seasons
+                   (imdb_id, season, episode_count, airing, updated_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(imdb_id, season) DO UPDATE SET
+                   episode_count = excluded.episode_count,
+                   airing = excluded.airing,
+                   updated_at = excluded.updated_at""",
+            [(imdb_id, season, count, 1 if season == airing_season else 0, now)
+             for season, count in counts.items()],
+        )
+
+
+def airing_seasons():
+    """{(imdb_id, season)} that still have an episode yet to air."""
+    with connect() as conn:
+        return {(r["imdb_id"], r["season"]) for r in conn.execute(
+            "SELECT imdb_id, season FROM seasons WHERE airing = 1")}
+
+
+def seasons_checked_at():
+    """{imdb_id: the newest updated_at across its seasons}, for the refresh check."""
+    with connect() as conn:
+        return {r["imdb_id"]: r["checked"] for r in conn.execute(
+            "SELECT imdb_id, MAX(updated_at) AS checked FROM seasons GROUP BY imdb_id")}
 
 
 def set_hidden(event_ids, hidden=True):
