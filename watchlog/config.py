@@ -168,7 +168,21 @@ APPLETV_STALE_AFTER_MINUTES = 15
 # An allowlist rather than a blocklist: only these apps are logged. This is also
 # what keeps Plex-on-the-Apple-TV from being counted twice, since the Plex
 # webhook already reports it regardless of which device played it.
+#
+# The bundle ids are real ones, read out of the listener's own journal: it logs
+# "ignoring app <id> (<name>)" the first time it sees each app, so anything
+# played on this device has already named itself there. Prime Video is the one
+# exception below -- it has never appeared in that log, so its id is the
+# published one rather than an observed one. If the guess is wrong nothing
+# breaks quietly: the next Prime play writes an "ignoring app" line naming the
+# real id, and that line is the fix.
+#
+# Known and deliberately left out: com.netflix.Netflix and
+# com.google.ios.youtubeunplugged (YouTube TV) report nothing usable, and
+# sport needs rules of its own before it belongs in a log built around
+# seasons and episodes.
 APPLETV_APPS = {
     "com.apple.TVWatchList": "Apple TV",
+    "com.amazon.aiv.AIVApp": "Prime Video",
 }
 PLEX_TOKEN = _get("PLEX_TOKEN", "")

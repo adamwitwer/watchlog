@@ -450,3 +450,41 @@ RISKS AND OPEN QUESTIONS
     have appeared on a database written an hour earlier -- and would have failed at query
     time, long after the deploy looked fine.
 
+24. Prime Video added to the Apple TV allowlist, and the Vox Machina gap explained.
+
+    The gap looked like a missed scrape. It was not. Plex's library says all twelve S4
+    episodes are watched, but its play history -- which is what both the webhook and
+    reconcile read -- has only seven. The reason is in the timestamps:
+
+        E8  2026-06-28 15:03
+        E9  2026-06-28 15:03
+        E10 2026-06-28 15:03
+        E11 2026-06-28 15:04
+        E12 2026-06-28 15:04
+
+    Five episodes "viewed" inside sixty seconds on a Sunday afternoon. That is the Plex UI
+    marking them watched in bulk, not playback. viewCount and lastViewedAt get set; no
+    session is ever recorded; nothing reaches /status/sessions/history/all. Both sensors
+    and the safety net behaved correctly and there was nothing to catch.
+
+    So this is a third blind spot, distinct from the other two, and the only one that is
+    invisible from inside the log: an episode marked watched rather than played leaves no
+    trace anywhere this project looks. A library sweep on viewCount could find them, at
+    the cost of recording the mark time rather than the watch time. Not built; noted.
+
+    Also checked while in there: a 400-day dry-run reconcile saw 282 rows and found 0
+    missing. The webhook and its safety net are demonstrably keeping up, and
+    RECONCILE_DAYS = 7 has not cost anything -- though it remains true that anything
+    dropped and not caught inside a week is gone with no alarm.
+
+    The allowlist ids are worth a note: the listener logs "ignoring app <id> (<name>)" the
+    first time it sees an app, so the journal is a list of real bundle ids for everything
+    ever played on that device. Netflix, Plex, YouTube TV and Music are all in there.
+    Prime Video is not -- which is its own small confirmation that Vox Machina was never
+    watched on Prime -- so its id is the published one and unverified. If it is wrong the
+    next Prime play will say so in the log, by name.
+
+    YouTube TV (com.google.ios.youtubeunplugged) is known and deliberately excluded for
+    now. Sport has no seasons, no episodes and no natural end, and would need its own
+    rules before it belonged on a page built around all three.
+

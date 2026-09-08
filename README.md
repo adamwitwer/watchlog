@@ -23,7 +23,9 @@ web host. The only public surface is that flat file.
 - **Apple TV** — a `pyatv` listener holds a connection to the Apple TV 4K and reports the
   playing title, position, and *which app* is playing. Push updates fire only on state
   change, so position is polled as well. Apps are allowlisted, which is also what stops
-  Plex-on-the-Apple-TV being counted twice.
+  Plex-on-the-Apple-TV being counted twice. The listener names every app it skips in its
+  own log, so `journalctl -u watchlog-appletv | grep "ignoring app"` is the list of real
+  bundle ids to allowlist from.
 - **By hand** — the admin page can create a whole entry for anything no sensor reaches.
   Netflix above all: it reports no metadata at all from the Apple TV, so it is typed or it
   is nothing. Manual entries are stored with `source = manual` and the same dedup key
@@ -265,6 +267,22 @@ DHCP lease.** A hardcoded `192.168.x.y` works right up until the router reboots 
 it a different one, at which point reconcile fails hourly and nothing gets logged. Watch
 out for hosts with more than one active interface, too — a Mac with Ethernet and Wi-Fi
 both up holds two addresses, and the wired one can be an order of magnitude faster.
+
+### What the log cannot see
+
+Three blind spots, and they are different from each other:
+
+- **Apps that aren't allowlisted.** Nothing outside `APPLETV_APPS` is recorded at all.
+- **Anything dropped for more than a week.** `RECONCILE_DAYS` is 7, so a play the webhook
+  misses and the safety net doesn't catch inside seven days is gone, with no alarm. A
+  400-day dry-run reconcile currently finds nothing missing, so this has not cost anything
+  yet.
+- **Episodes *marked* watched rather than played.** This is the invisible one. Plex's
+  library records `viewCount` and `lastViewedAt` when you mark a season watched in the UI,
+  but no session is created, so nothing appears in the play history that both the webhook
+  and reconcile read. The log and Plex then disagree while both are behaving correctly.
+  Five episodes of one show were found this way, all "viewed" within sixty seconds of each
+  other on a Sunday afternoon.
 
 ## Known limits
 
