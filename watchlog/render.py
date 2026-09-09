@@ -147,6 +147,10 @@ def build_html():
         # whatever survived the filter. "Feb" alone is not enough: filtered
         # results can put February 2026 directly above February 2025.
         entry["month_key"] = moment.strftime("%Y-%m")
+        # Every entry carries the label, not just the first of its month: the
+        # filter can promote any row to be the month's first, and a label read
+        # from the row itself follows without the script having to move text.
+        entry["month_label"] = moment.strftime("%B %Y")
         entry["rail_tick"] = entry["month_start"] or (index - 1) % step == 0
         previous_month = month
 

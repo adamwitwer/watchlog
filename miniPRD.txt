@@ -518,3 +518,25 @@ RISKS AND OPEN QUESTIONS
     spelling the log already uses for that normalised title, which protects the webhook's
     imports too and not just the sweep's.
 
+26. Month markers in the list. Adam saw an orange line on the page and asked whether it
+    demarcated a month. It did not -- it was li:target, the anchor highlight left behind
+    by a rail click, which persists until the fragment changes. The rail's month ticks
+    were correct all along (verified: 12 ticks, each on the true first entry of its
+    month).
+
+    But the question was the useful part. The list had no month structure at all; only
+    the rail did, and reading it meant watching the right edge out of the corner of your
+    eye. So: a heavier rule and a small label, not a heading of its own. Months here are
+    a texture to navigate by, not a hierarchy the entries sit inside, and a full heading
+    would have claimed more than that.
+
+    The filter made it slightly more than a CSS change. The marker belongs to the first
+    SURVIVING row of a month, and hiding the row that carried it would either lose the
+    marker or, worse, strand a label above entries no longer beneath it. So every row
+    carries its own data-mlabel and the script moves a single class; the text follows by
+    itself, with no DOM to build or tear down per keystroke.
+
+    Verified in the browser against a copy of the real log: 12 markers on the true
+    boundaries, filtering to "reacher" promotes them to the surviving rows, clearing
+    restores all twelve, and it reads correctly in both themes.
+

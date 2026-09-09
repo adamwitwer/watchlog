@@ -74,6 +74,39 @@
     border-top: 1px solid var(--rule);
   }
 
+  /* Where one month becomes the next. The rail has always known, but nothing
+     in the list itself said so, and scrolling a year of entries you had to
+     read dates to find out. A heavier rule and a small label, rather than a
+     heading of its own: the months are a texture to navigate by, not a
+     hierarchy the entries belong to.
+
+     The label is drawn from the row's own data-mlabel, so when the filter
+     promotes a different row to be a month's first it only has to move one
+     class -- the text follows by itself. */
+  li.month-start {
+    border-top-width: 2px;
+    border-top-color: var(--muted);
+    position: relative;
+  }
+
+  li.month-start::before {
+    content: attr(data-mlabel);
+    position: absolute;
+    top: 0.5rem;
+    right: 0;
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  /* The first entry on the page sits directly under the header, where a rule
+     and a label would read as a divider between two things rather than the
+     start of one. */
+  li.month-start:first-child { border-top-width: 1px; }
+  li.month-start:first-child::before { top: 0.35rem; }
+
   .title {
     font-size: clamp(1.45rem, 5vw, 2rem);
     font-weight: 600;
@@ -326,7 +359,9 @@
   <ol>
     {% for entry in entries %}
     <li id="{{ entry.anchor }}" data-q="{{ entry.q }}"
-        data-mkey="{{ entry.month_key }}" data-mon="{{ entry.month_short }}">
+        data-mkey="{{ entry.month_key }}" data-mon="{{ entry.month_short }}"
+        data-mlabel="{{ entry.month_label }}"
+        {%- if entry.month_start %} class="month-start"{% endif %}>
       <p class="title">
         {%- if entry.imdb_id %}
         <a href="https://www.imdb.com/title/{{ entry.imdb_id }}/">{{ entry.title }}</a>
@@ -442,6 +477,18 @@
     if (!rail.hidden) rail.appendChild(frag);
   }
 
+  /* The heavier rule belongs to the first SURVIVING row of each month, which
+     filtering can change: hide the row that carried it and the month would
+     lose its marker, or worse, keep a label sitting above entries that are no
+     longer under it. Recomputed from whatever is left, every keystroke. */
+  function markMonths(visible) {
+    var previous = null;
+    visible.forEach(function (row) {
+      row.classList.toggle('month-start', row.dataset.mkey !== previous);
+      previous = row.dataset.mkey;
+    });
+  }
+
   function apply() {
     var words = fold(input.value).split(' ').filter(Boolean);
     var visible = [];
@@ -451,6 +498,10 @@
       row.classList.toggle('off', !hit);
       if (hit) visible.push(row);
     });
+
+    /* With no query every row is a survivor, so this restores the rendered
+       state as well as computing the filtered one. */
+    markMonths(visible);
 
     if (!words.length) {
       count.textContent = '';

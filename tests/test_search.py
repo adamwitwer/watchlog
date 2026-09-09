@@ -110,8 +110,16 @@ for watched_at, kind, title, episode_title, year, season, episode in SEED:
 html, count = render.build_html()
 check("all three entries rendered", count == 3)
 
-rows = re.findall(r'<li id="(e\d+)" data-q="([^"]*)"\s+'
-                  r'data-mkey="([^"]*)" data-mon="([^"]*)">', html)
+# Parsed attribute by attribute rather than positionally: the opening tag has
+# grown a label and a conditional class, and a regex pinned to their order
+# fails for reasons that have nothing to do with the filter.
+opens = re.findall(r'<li id="e\d+"[^>]*>', html, re.S)
+def attr(tag, name):
+    found = re.search(name + r'="([^"]*)"', tag)
+    return found.group(1) if found else None
+
+rows = [(attr(t, "id"), attr(t, "data-q"), attr(t, "data-mkey"),
+         attr(t, "data-mon")) for t in opens]
 check("every entry carries what the filter reads", len(rows) == 3)
 check("the two Severance nights collapsed into one month key, and Heat is its own",
       [r[2] for r in rows] == ["2026-03", "2026-03", "2026-01"])
@@ -121,6 +129,17 @@ check("a data-q holds the folded row",
       rows[0][1] == "severance s2 e1 hello ms cobel plex")
 check("the movie's data-q has no season label",
       rows[2][1] == "heat plex")
+
+# --- where one month becomes the next ---------------------------------------
+check("the first entry of each month is marked, and only the first",
+      [("month-start" in t) for t in opens] == [True, False, True])
+check("every entry carries its own month label, not just the marked ones",
+      [attr(t, "data-mlabel") for t in opens]
+      == ["March 2026", "March 2026", "January 2026"])
+# The filter can hide the row that carried the rule, so the script recomputes
+# it from whatever survived rather than trusting what was rendered.
+check("the script recomputes the marker as the filter runs",
+      "markMonths" in html and "month-start" in html.split("<script>")[1])
 
 check("the box ships hidden, so no-JavaScript never sees a dead input",
       '<div class="search" hidden>' in html)

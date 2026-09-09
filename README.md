@@ -62,6 +62,12 @@ where they're known, the episode title, the date, the service, and a link to IMD
   jumps to that entry. On touch it becomes a labelled month index instead, since hover
   cannot reveal anything and a 4px tick is not a tap target. Past `RAIL_MAX_TICKS` the
   fine ticks thin out so the rail stays legible however long the log gets.
+- **Month markers** — a heavier rule and a small label where one month becomes the next.
+  The rail has always known where the boundaries are; the list itself said nothing, so
+  scrolling a year of entries you had to read dates to find out. A rule rather than a
+  heading, because the months are a texture to navigate by, not a hierarchy the entries
+  belong to. Every entry carries its own `data-mlabel`, so when the filter hides the row
+  that held the marker the script moves one class and the label follows.
 - **Filtering** narrows the list as you type — `/` to focus, Escape to clear. Every entry
   is already in the page, so this is one substring test per row per keystroke: about
   0.2ms for the whole log, with no index and nothing to fetch. It matches the title, the
