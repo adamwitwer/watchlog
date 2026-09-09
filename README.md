@@ -39,7 +39,8 @@ web host. The only public surface is that flat file.
   everything else on a page built around large type. Movies stay individual.
 - **Enrichment** — TMDb resolves titles that arrive without ids into IMDb ids and years,
   cached per title. A `locked` flag pins a hand-corrected match so the enricher leaves it
-  alone.
+  alone. The same module also learns how many episodes each watched season has, which is
+  what lets the log tell finishing a show from giving up on one.
 - **Publish** — Jinja2 renders the page and a JSON feed of the same entries; rsync over
   SSH puts both on NearlyFreeSpeech, alongside an `.htaccess` that stops the host's edge
   cache serving a stale copy for a quarter of an hour after every publish. `write_output()`
@@ -51,7 +52,7 @@ Newest first, large type, no images. Each entry carries the title, the season an
 where they're known, the episode title, the date, the service, and a link to IMDb.
 
 - **Every entry is shown.** `PAGE_LIMIT` is `None`. The page is repetitive enough to
-  compress about 10:1 — 233 entries are 164KB of HTML and 18KB over the wire — so there is
+  compress about 9:1 — 240 entries are 179KB of HTML and 19KB over the wire — so there is
   little reason to cap it.
 - **Episode titles** appear for nights of up to `EPISODE_TITLES_MAX` episodes. A longer
   binge keeps the episode range and drops the titles rather than turning one scannable
@@ -76,10 +77,10 @@ where they're known, the episode title, the date, the service, and a link to IMD
   released that year. While a filter is on, the rail rebuilds itself from the survivors,
   one tick per month, and disappears entirely when fewer than two months are left.
 
-The one piece of JavaScript on the page is that filter, about 90 lines, inline. The
-search box ships `hidden` and the script reveals it, so a browser without JavaScript is
-never shown an input that cannot do anything — and everything else here, the rail
-included, is anchors and CSS that works regardless.
+The one piece of JavaScript on the page is that filter and the month markers it keeps in
+step, about 110 lines, inline. The search box ships `hidden` and the script reveals it, so
+a browser without JavaScript is never shown an input that cannot do anything — and
+everything else here, the rail included, is anchors and CSS that works regardless.
 
 Each row carries a `data-q` attribute holding its searchable text, folded by
 `render.search_normalize` — lowercased, diacritics stripped, apostrophes deleted so
@@ -95,7 +96,7 @@ published by the same rsync that publishes the page, so the two cannot drift apa
 
 It exists so something can *ask questions* of the log rather than read it: which shows in
 Q1, how many films this year, when a series was last touched. The whole thing is one
-document — 58KB, 8.5KB gzipped over the wire — so there is no paging and no query string.
+document — 71KB, 10KB gzipped over the wire — so there is no paging and no query string.
 A reader fetches it once and has everything.
 
 The unit is the display entry, not the raw event: a night of five episodes is one thing
@@ -202,6 +203,9 @@ silent when idle. Most of them have failed silently at least once.
   exception and carry on — only reconcile lets it propagate — so a web host that had
   stopped accepting the file would leave everything on the Pi looking perfect while the
   live page quietly went stale.
+- **The library sweep** rides on the reconcile timer once a day, and is the only thing
+  that can see an episode marked watched rather than played. Its own silence would be
+  indistinguishable from there being nothing to find.
 
 So each of them records what happened, and the admin page reads it back:
 
@@ -209,14 +213,17 @@ So each of them records what happened, and the admin page reads it back:
 ● Plex webhook delivered 2 hours ago
 ● Apple TV listener polled just now
 ● Last reconcile 18 minutes ago
+● Last library sweep 3 hours ago
 ● Last publish 18 minutes ago
 ```
 
 A line goes red two ways, and they are not the same thing:
 
 - **Stale** — a heartbeat that has stopped being refreshed. Applies only to something with
-  a cadence to miss: reconcile runs hourly, the listener polls constantly. Publishing has
-  no cadence, so a quiet week there is a quiet week, not a fault.
+  a cadence to miss: reconcile runs hourly, the sweep daily, the listener constantly.
+  Publishing has no cadence, so a quiet week there is a quiet week, not a fault. The sweep
+  is given twice its cadence before it counts as late, since it rides on the reconcile
+  timer and one skipped hour would otherwise raise two alarms saying the same thing.
 - **Failed** — the last attempt raised, whatever its age. Age alone was not enough:
   reconcile could error at 10:00, still be holding a 09:00 success, and read green for
   another hour.
@@ -239,12 +246,14 @@ Four systemd units on the Pi, all enabled at boot:
 | `watchlog-webhook.service` | receives Plex scrobbles |
 | `watchlog-appletv.service` | holds the `pyatv` connection |
 | `watchlog-admin.service` | the private admin page |
-| `watchlog-reconcile.timer` | hourly catch-up against Plex history |
+| `watchlog-reconcile.timer` | hourly catch-up against Plex history; also refreshes TMDb season lengths, and sweeps the Plex library once a day |
 
 ```
 python -m watchlog.plex_history --reconcile --dry-run   # what the timer would import
+python -m watchlog.plex_history --sweep --dry-run       # what the library says is missing
 python -m watchlog.render                               # render without publishing
-python -m tests.test_grouping    # and test_admin, test_feed, test_search, test_tracker
+python -m tests.test_grouping   # and test_admin, test_feed, test_search, test_sweep,
+                                # test_tracker
 ```
 
 ## Backfill
@@ -274,7 +283,7 @@ it a different one, at which point reconcile fails hourly and nothing gets logge
 out for hosts with more than one active interface, too — a Mac with Ethernet and Wi-Fi
 both up holds two addresses, and the wired one can be an order of magnitude faster.
 
-### What the log cannot see
+## What the log cannot see
 
 Three blind spots, and they are different from each other:
 
@@ -320,8 +329,10 @@ Two things bound it, both learned by running it:
 - **The Apple TV listener only sees the living-room box.** Plex is observed at the server
   and so covers every client; the Apple TV is observed at one device. Watching Apple TV+
   on a laptop or a phone is invisible.
-- **There is no UI for correcting a bad TMDb match.** The `titles.locked` column exists
-  for it, but nothing exposes it yet.
+- **The `titles` cache is keyed on the normalised title alone**, which is not unique across
+  media types — `Furious` the 2026 series and `The Furious` the 2026 film share a key. Both
+  arrived from Plex with ids attached so neither has been bitten, but a film and a series
+  that both needed resolving would poison each other's cached id.
 
 ## A note on what's public
 
