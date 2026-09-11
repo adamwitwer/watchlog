@@ -540,3 +540,37 @@ RISKS AND OPEN QUESTIONS
     boundaries, filtering to "reacher" promotes them to the surviving rows, clearing
     restores all twelve, and it reads correctly in both themes.
 
+27. The listener's heartbeat was lying. Adam watched Ted Lasso in the Apple TV app --
+    allowlisted, the simplest possible case -- and nothing appeared. Not even a "now
+    playing" line.
+
+    The sockets told it: three connections to the Apple TV, all ESTABLISHED, every one with
+    lastsnd and lastrcv of about 50 hours. The outage on the night of 2026-09-08 rebooted
+    the Apple TV; the Mini and the Pi rode through on the UPS and it did not. Its side of
+    the connections vanished and the Pi was never told.
+
+    What made that invisible: metadata.playing() never touches the network. pyatv answers
+    it from a local cache fed by push updates -- measured at 0.1ms, against 27ms for a call
+    that actually reaches the device. So on a dead connection the poll succeeds instantly,
+    forever, with the last state it heard. The timeout added after the first wedge (item
+    16) had nothing to catch. And the heartbeat was recorded on every successful poll, so
+    "Apple TV listener polled 2 minutes ago" read green on the admin page for fifty hours.
+    I read that exact line on 2026-09-09 as proof the listener was healthy. It was ten
+    hours deaf at the time.
+
+    The fix: the heartbeat is earned only by atv.apps.app_list(), a read-only request the
+    device must answer itself, every five minutes and on the very next tick after a miss.
+    Three misses and the connection is torn down and rebuilt. The counts for poll failures
+    and probe failures are separate on purpose -- if a cached poll's success reset the
+    count a failed probe was building, the two would alternate every thirty seconds and the
+    listener would never reconnect. That interaction is the whole bug in miniature.
+
+    tests/test_listener.py rebuilds the dead connection from fakes: a playing() that
+    answers from cache and a device that hangs, resets, or replies. It passes on the new
+    listener and fails 7 of 14 on the old one, which is what makes it a regression test
+    rather than a description.
+
+    Worth remembering past this project: this needs no outage. Apple TVs install tvOS
+    updates overnight and reboot themselves, and every one of those would have done the
+    same thing.
+

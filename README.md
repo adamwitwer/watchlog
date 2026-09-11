@@ -195,10 +195,18 @@ silent when idle. Most of them have failed silently at least once.
 - **`watchlog-reconcile.timer`** covers that by re-reading the last `RECONCILE_DAYS` of
   Plex's own history every hour and importing whatever is missing. Plex's history is the
   server's own record and is never wrong.
-- **The Apple TV listener** can wedge. `atv.metadata.playing()` has no timeout of its own,
-  so the half-open connection a router reboot leaves behind made it await forever — with
-  the process up, the socket still `ESTABLISHED`, and nothing in the log. The poll is now
-  bounded, and a few unanswered polls in a row force a reconnect.
+- **The Apple TV listener** can go deaf, and has done it two different ways — both from
+  the half-open connection a reboot leaves behind, where the device has gone but the Pi was
+  never told. The first time, `atv.metadata.playing()` awaited forever: eleven hours,
+  nothing in the log. So the poll was bounded. The second time, after a power cut rebooted
+  the Apple TV, `playing()` answered *instantly* — because pyatv serves it from a local
+  cache and never touches the network. The bound had nothing to catch, and since the
+  heartbeat was recorded on every poll, the admin page read green for fifty hours while
+  the listener heard nothing. Now the heartbeat is earned only by a request the device has
+  to answer itself — listing its apps, about 30ms — asked every five minutes, and on the
+  very next tick after a miss. Three misses and the connection is rebuilt. The two failure
+  counts are kept apart, so a cached poll succeeding can never cancel out a device that
+  isn't replying.
 - **Publishing** can fail on its own. Three of `push()`'s four callers catch the
   exception and carry on — only reconcile lets it propagate — so a web host that had
   stopped accepting the file would leave everything on the Pi looking perfect while the
@@ -220,7 +228,8 @@ So each of them records what happened, and the admin page reads it back:
 A line goes red two ways, and they are not the same thing:
 
 - **Stale** — a heartbeat that has stopped being refreshed. Applies only to something with
-  a cadence to miss: reconcile runs hourly, the sweep daily, the listener constantly.
+  a cadence to miss: reconcile runs hourly, the sweep daily, the listener's probe every
+  five minutes.
   Publishing has no cadence, so a quiet week there is a quiet week, not a fault. The sweep
   is given twice its cadence before it counts as late, since it rides on the reconcile
   timer and one skipped hour would otherwise raise two alarms saying the same thing.
@@ -252,8 +261,8 @@ Four systemd units on the Pi, all enabled at boot:
 python -m watchlog.plex_history --reconcile --dry-run   # what the timer would import
 python -m watchlog.plex_history --sweep --dry-run       # what the library says is missing
 python -m watchlog.render                               # render without publishing
-python -m tests.test_grouping   # and test_admin, test_feed, test_search, test_sweep,
-                                # test_tracker
+python -m tests.test_grouping   # and test_admin, test_feed, test_search, test_sweep;
+                                # test_tracker and test_listener need pyatv, so the Pi
 ```
 
 ## Backfill

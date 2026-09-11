@@ -173,17 +173,26 @@ PLEX_SERVER_URL = _get("PLEX_SERVER_URL", "")
 # Push updates fire only on state change, so position has to be polled.
 APPLETV_POLL_SECONDS = 30
 
-# atv.metadata.playing() has no timeout of its own. A half-open connection --
-# which is what a router reboot leaves behind -- makes it await forever, and the
-# listener then sits there looking perfectly healthy: process up, socket still
-# ESTABLISHED, not one line in the log. Measured on 2026-09-04, it had polled
-# nothing for 11 hours. Bound the wait, and give up on the connection after a
-# few in a row so the reconnect loop can do its job.
+# A half-open connection -- what a router reboot or an Apple TV reboot leaves
+# behind -- has failed this listener twice, in two different ways:
+#
+#   2026-09-04  playing() awaited forever. Eleven hours, nothing in the log.
+#               Fixed by bounding the wait, and giving up after a few misses.
+#   2026-09-08  playing() answered instantly, from pyatv's cache, forever. The
+#               bound never fired because nothing was waited on, and since the
+#               heartbeat was recorded on every poll it read green for fifty
+#               hours while the listener heard nothing.
+#
+# So the poll is bounded (for the first) and the device is separately asked a
+# question it must answer itself, every heartbeat period (for the second). The
+# same limit applies to both: this many misses in a row and the connection is
+# abandoned and rebuilt.
 APPLETV_POLL_TIMEOUT = 15
 APPLETV_MAX_POLL_FAILURES = 3
 
-# How often the listener records that it is alive, and how long that record can
-# go unrefreshed before the admin page calls it stale.
+# How often the device is asked whether it is really there, which is also the
+# only thing allowed to refresh the heartbeat -- and how long that heartbeat
+# can go unrefreshed before the admin page calls it stale.
 APPLETV_HEARTBEAT_SECONDS = 300
 APPLETV_STALE_AFTER_MINUTES = 15
 
