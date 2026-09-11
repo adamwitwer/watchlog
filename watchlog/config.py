@@ -163,8 +163,12 @@ EPISODE_TITLES_MAX = 3
 # Suggestions for the admin's "add an entry" service field, not a restriction --
 # the field is free text. These are the platforms no sensor can reach: Netflix
 # reports nothing from the Apple TV, and the rest were never wired up at all.
+# "Apple TV", not "Apple TV+": it has to be the exact string the Apple TV
+# listener writes (see APPLETV_APPS), or a typed entry and a sensed one for the
+# same show carry two different services. The same goes for "Prime Video".
+# test_admin checks that every sensor label is offered here.
 MANUAL_SERVICES = [
-    "Netflix", "Prime Video", "Disney+", "Max", "Hulu",
+    "Netflix", "Apple TV", "Prime Video", "Disney+", "Max", "Hulu",
     "Paramount+", "Peacock", "YouTube", "Theater",
 ]
 

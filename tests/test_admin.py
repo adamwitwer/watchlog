@@ -493,6 +493,9 @@ client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
 page = client.get("/").get_data(as_text=True)
 check("the add form is rendered", 'action="/add"' in page)
 check("the service suggestions are offered", "Prime Video" in page)
+check("every service a sensor writes can also be typed, spelled the same way",
+      all(f'<option value="{name}">' in page
+          for name in config.APPLETV_APPS.values()))
 check("the date defaults to today",
       datetime.now().astimezone().date().isoformat() in page)
 check("the match form is rendered", 'action="/match"' in page)
