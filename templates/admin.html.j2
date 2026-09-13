@@ -69,6 +69,14 @@
   details.edit summary::before { content: "+ "; }
   details.edit[open] summary::before { content: "− "; }
   details.edit summary:hover { color: var(--accent); }
+  /* Styled as a sibling of the disclosures beside it, since it does the same
+     kind of job: opens a form, doesn't change anything by itself. */
+  .nextep {
+    flex-basis: 100%; margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted);
+    letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none;
+  }
+  .nextep::before { content: "→ "; }
+  .nextep:hover { color: var(--accent); }
   .fields {
     display: flex; flex-wrap: wrap; gap: 0.5rem;
     align-items: center; margin-top: 0.6rem;
@@ -166,7 +174,7 @@
     <a href="https://adamwitwer.com/watchlog/">view it</a>.
   </p>
 
-  <details class="add">
+  <details class="add" id="add"{% if prefill %} open{% endif %}>
     <summary>Add an entry by hand</summary>
     <form method="post" action="{{ url_for('add') }}">
       <div class="fields">
@@ -176,7 +184,8 @@
                  value="{{ today }}" required>
           <label for="add-service">On</label>
           <input class="svc" type="text" id="add-service" name="service"
-                 list="services" placeholder="Netflix" maxlength="40" required>
+                 list="services" placeholder="Netflix" maxlength="40" required
+                 value="{{ prefill.service if prefill else '' }}">
           <datalist id="services">
             {% for s in services %}<option value="{{ s }}">{% endfor %}
           </datalist>
@@ -187,17 +196,22 @@
         </div>
         <div class="row">
           <input class="wide" type="text" name="title" maxlength="200" required
-                 placeholder="Title — the series name, or the film">
+                 placeholder="Title — the series name, or the film"
+                 value="{{ prefill.title if prefill else '' }}">
           <input class="num" type="number" min="0" step="1" name="year"
-                 placeholder="Year">
+                 placeholder="Year"
+                 value="{{ prefill.year if prefill and prefill.year is not none else '' }}">
         </div>
         <div class="row">
           <label>Season</label>
-          <input class="num" type="number" min="0" step="1" name="season">
+          <input class="num" type="number" min="0" step="1" name="season"
+                 value="{{ prefill.season if prefill and prefill.season is not none else '' }}">
           <label>Ep</label>
-          <input class="num" type="number" min="0" step="1" name="episode">
+          <input class="num" type="number" min="0" step="1" name="episode"
+                 value="{{ prefill.episode if prefill and prefill.episode is not none else '' }}">
           <input class="wide" type="text" name="episode_title" maxlength="200"
-                 placeholder="Episode title (optional)">
+                 placeholder="Episode title (optional)"
+                 value="{{ prefill.episode_title or '' if prefill else '' }}">
           <button type="submit">Add</button>
         </div>
       </div>
@@ -252,6 +266,11 @@
         <input type="hidden" name="ids" value="{{ entry.id_list }}">
         <button type="submit">Delete</button>
       </form>
+      {% if entry.media_type == 'episode' %}
+      {#- A link, not a form: it only fills in the add form below, and adding
+          still takes a click on Add. #}
+      <a class="nextep" href="{{ url_for('index', next=entry.ids[0]) }}#add">Next episode</a>
+      {% endif %}
       {% if entry.editable %}
       <details class="edit">
         <summary>Edit episode details</summary>

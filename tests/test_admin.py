@@ -28,6 +28,10 @@ _real_push = admin.publish.push        # the stub below replaces it globally
 admin.render.write_output = lambda: published.append("render")
 admin.publish.push = lambda: published.append("push")
 admin.enrich.enrich_pending = lambda: enriched.append(1)
+# TMDb is never called: the next-episode form looks names up from this instead.
+EPISODE_NAMES = {}
+admin.enrich.episode_name = lambda imdb, season, episode: EPISODE_NAMES.get(
+    (imdb, season, episode))
 
 db.init()
 
@@ -485,6 +489,72 @@ client.delete_cookie("watchlog_admin")
 response = client.post("/rename", data={"title": "Split Show",
                                         "new_title": "Nope", "media_type": "episode"})
 check("renaming 404s without a token", response.status_code == 404)
+client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
+
+
+# --- the next episode --------------------------------------------------------
+# A series watched where no sensor can see it: each episode used to mean typing
+# the same show, service and season again. The link fills the add form in; the
+# Add button still does the adding.
+
+import re                                                         # noqa: E402
+
+def form_value(page, name):
+    found = re.search(r'name="%s"[^>]*?value="([^"]*)"' % name, page, re.S)
+    return found.group(1) if found else None
+
+NEXT = "Next Up Show"
+for episode, day in ((1, "2026-08-01"), (2, "2026-08-02"), (3, "2026-08-03")):
+    db.insert_event({
+        "watched_at": f"{day}T20:00:00+00:00", "source": "manual", "service": "Netflix",
+        "media_type": "episode", "title": NEXT, "episode_title": f"E{episode}",
+        "year": 2025, "season": 2, "episode": episode, "imdb_id": "tt-next",
+        "dedup_key": f"next up show|episode|2|{episode}",
+    })
+EPISODE_NAMES[("tt-next", 2, 4)] = "The Fourth One"
+first_id = rows(NEXT)[0]["id"]
+
+published.clear()
+page = client.get(f"/?next={first_id}").get_data(as_text=True)
+check("every episode entry offers the link", 'class="nextep"' in page)
+check("following it opens the add form", '<details class="add" id="add" open>' in page)
+check("...with the show filled in", form_value(page, "title") == NEXT)
+check("...and the service it was last watched on", form_value(page, "service") == "Netflix")
+check("...and the same season", form_value(page, "season") == "2")
+check("...and the episode after the latest one logged, even from an older entry",
+      form_value(page, "episode") == "4")
+check("...and that episode's title, looked up", form_value(page, "episode_title")
+      == "The Fourth One")
+check("...and the year", form_value(page, "year") == "2025")
+check("just opening the form writes nothing and publishes nothing",
+      len(rows(NEXT)) == 3 and published == [])
+
+EPISODE_NAMES.clear()
+page = client.get(f"/?next={first_id}").get_data(as_text=True)
+check("when TMDb has no title the field is simply left empty",
+      form_value(page, "episode_title") == "" and form_value(page, "episode") == "4")
+
+db.set_season_lengths("tt-next", {2: 3})
+page = client.get(f"/?next={first_id}").get_data(as_text=True)
+check("at the end of a season it moves on to the next one",
+      (form_value(page, "season"), form_value(page, "episode")) == ("3", "1"))
+
+film_id = rows(FILM)[0]["id"]
+page = client.get(f"/?next={film_id}").get_data(as_text=True)
+check("a film has no next episode, so the form stays closed",
+      '<details class="add" id="add" open>' not in page)
+page = client.get("/?next=99999").get_data(as_text=True)
+check("an unknown entry is ignored rather than an error",
+      '<details class="add" id="add" open>' not in page)
+page = client.get("/?next=nope").get_data(as_text=True)
+check("so is something that isn't an id at all",
+      '<details class="add" id="add" open>' not in page)
+check("with no request, the form is not pre-filled",
+      form_value(client.get("/").get_data(as_text=True), "title") == "")
+
+client.delete_cookie("watchlog_admin")
+check("the pre-filled page 404s without a token",
+      client.get(f"/?next={first_id}").status_code == 404)
 client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
 
 

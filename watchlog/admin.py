@@ -193,10 +193,66 @@ def _decorate(entries, by_id=None):
     return entries
 
 
+def _next_episode(event_id):
+    """The add form, filled in with the episode after this show's latest.
+
+    For a series no sensor can see -- Netflix, mostly -- where the entries come
+    one after another and each one used to mean typing the same show, service
+    and season again. It pre-fills rather than adds: one click on an old entry
+    by mistake should cost nothing, and the Add button is already the place
+    duplicates get refused.
+
+    "Latest" is the highest season and episode logged for the show, not the
+    entry that was clicked, so the link works from any entry. When TMDb says
+    the season is over, the next episode is the first of the season after.
+    """
+    with db.connect() as conn:
+        start = conn.execute(
+            "SELECT title, media_type FROM events WHERE id = ?", (event_id,)
+        ).fetchone()
+        if not start or start["media_type"] != "episode":
+            return None
+        key = normalize(start["title"])
+        rows = [r for r in conn.execute(
+                    "SELECT * FROM events WHERE media_type = 'episode' AND hidden = 0")
+                if normalize(r["title"]) == key]
+    if not rows:
+        return None
+
+    numbered = [r for r in rows if r["season"] is not None and r["episode"] is not None]
+    newest = max(rows, key=lambda r: r["watched_at"])
+    latest = max(numbered, key=lambda r: (r["season"], r["episode"])) if numbered else None
+
+    titles = [r["title"] for r in rows]
+    imdb_ids = [r["imdb_id"] for r in rows if r["imdb_id"]]
+    imdb_id = max(set(imdb_ids), key=imdb_ids.count) if imdb_ids else None
+
+    season = episode = None
+    if latest:
+        season, episode = latest["season"], latest["episode"] + 1
+        length = db.season_lengths().get((imdb_id, latest["season"])) if imdb_id else None
+        if length and latest["episode"] >= length:
+            season, episode = latest["season"] + 1, 1
+
+    return {
+        "title": max(set(titles), key=titles.count),
+        "service": newest["service"],
+        "year": next((r["year"] for r in sorted(rows, key=lambda r: r["watched_at"],
+                                                  reverse=True) if r["year"]), None),
+        "season": season,
+        "episode": episode,
+        "episode_title": (enrich.episode_name(imdb_id, season, episode)
+                          if imdb_id and episode else None),
+    }
+
+
 @app.get("/")
 def index():
     if not _authorised():
         return "Not found", 404
+
+    requested = request.args.get("next", "")
+    prefill = _next_episode(int(requested)) if requested.isdigit() else None
 
     rows = db.recent_events(limit=400)
     by_id = {r["id"]: r for r in rows}
@@ -209,6 +265,7 @@ def index():
                         services=config.MANUAL_SERVICES,
                         health=_health(),
                         today=datetime.now().astimezone().date().isoformat(),
+                        prefill=prefill,
                         error=request.args.get("error"),
                         notice=request.args.get("notice"))
     )

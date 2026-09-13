@@ -574,3 +574,23 @@ RISKS AND OPEN QUESTIONS
     updates overnight and reboot themselves, and every one of those would have done the
     same thing.
 
+28. Netflix automation, reconsidered and declined again -- this time on the terms rather
+    than on fragility. Adam asked about scraping the viewing-history page. Netflix's terms
+    forbid "robots, spiders, scrapers or other automated means" of access, and he doesn't
+    want to break them, which rules out the scraper and with it the point of studying the
+    page. The compliant routes -- Netflix's own "Download all" CSV, or its personal-data
+    export -- are human-initiated and batch, and not worth building for a service he uses
+    rarely.
+
+    The actual pain was narrower: typing consecutive episodes of one series. So each
+    episode entry in the admin now has a "Next episode" link that pre-fills the add form
+    with the show, service, season, the episode after the highest one logged, and that
+    episode's title from TMDb. It rolls into the next season when the known season length
+    says the last one is done.
+
+    It fills rather than adds. A misclick on a public log shouldn't write anything, and
+    the Add button is already where duplicates are refused. The TMDb lookup runs during a
+    page load, so it has a short timeout and every failure becomes an empty field rather
+    than an error: a missing suggestion costs fifteen seconds, a broken form costs the
+    entry. TMDb's "Episode 7" placeholders are treated as no title, as the page already
+    does.

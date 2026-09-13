@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 import requests
 
 from . import config, db
-from .grouping import normalize
+from .grouping import PLACEHOLDER_TITLE, normalize
 
 log = logging.getLogger("watchlog.enrich")
 
@@ -26,6 +26,7 @@ SEARCH = "https://api.themoviedb.org/3/search/multi"
 EXTERNAL = "https://api.themoviedb.org/3/{kind}/{id}/external_ids"
 FIND = "https://api.themoviedb.org/3/find/{imdb_id}"
 SHOW = "https://api.themoviedb.org/3/tv/{tmdb_id}"
+EPISODE = "https://api.themoviedb.org/3/tv/{tmdb_id}/season/{season}/episode/{episode}"
 TIMEOUT = 20
 
 
@@ -123,6 +124,45 @@ def enrich_pending(limit=200):
 
     log.info("enriched %d events across %d titles", updated, len(pending))
     return updated
+
+
+# --- one episode's title ----------------------------------------------------
+
+
+def episode_name(imdb_id, season, episode, timeout=5):
+    """The title of one episode, or None. Never raises.
+
+    Used to pre-fill the admin page's add form, so it runs while someone is
+    waiting on a page load: the timeout is short, and every failure -- no key,
+    no match, TMDb down, an episode it doesn't know -- quietly becomes an empty
+    field to type into rather than an error page. A missing suggestion costs
+    fifteen seconds; a broken form costs the entry.
+    """
+    if not config.TMDB_API_KEY or config.TMDB_API_KEY.startswith("TODO"):
+        return None
+    try:
+        tmdb_id = _tv_id(imdb_id)
+        if not tmdb_id:
+            return None
+        response = requests.get(
+            EPISODE.format(tmdb_id=tmdb_id, season=season, episode=episode),
+            params={"api_key": config.TMDB_API_KEY},
+            timeout=timeout,
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        name = (response.json().get("name") or "").strip()
+    except Exception as exc:
+        log.warning("episode title lookup failed for %s S%sE%s: %s",
+                    imdb_id, season, episode, exc)
+        return None
+    # TMDb lists announced episodes as "Episode 7" until they have a real name.
+    # The page already treats that as no title; suggesting it would just put it
+    # back.
+    if not name or PLACEHOLDER_TITLE.match(name):
+        return None
+    return name
 
 
 # --- season lengths ---------------------------------------------------------

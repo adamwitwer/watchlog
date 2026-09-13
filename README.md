@@ -170,6 +170,12 @@ internet. It can:
 - **edit** season, episode and episode title on any entry backed by a single event, which
   is every Apple TV entry, because the device reports none of the three
 - **add** an entry outright, resolving the IMDb link and year from the title
+- **log the next episode** — every episode entry has a link that opens the add form already
+  filled in: the show, the service it was last watched on, the episode after the highest
+  one logged (rolling into the next season when TMDb says the last one is over), and that
+  episode's title from TMDb. It fills the form rather than adding, so a stray click costs
+  nothing and Add is still where duplicates get refused. Built for the series no sensor
+  can see — Netflix, mostly — where each episode used to mean typing the same show again
 - **fix a title** — a show spelled two ways is two shows to anything that counts them, and
   until this existed the title was the one field on an entry with no way to correct it.
   Renames every spelling that shares the normalised key, but only within the same media
