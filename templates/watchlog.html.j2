@@ -50,6 +50,35 @@
 
   header { margin-bottom: clamp(2.5rem, 7vw, 4rem); }
 
+  /* Back to the site this page belongs to -- the other half of the homepage's
+     "See the log" link. The invader is the homepage's own mark, copied rather
+     than reinvented, and it marches on hover there too. currentColor so it
+     picks up the hover without a second rule. */
+  .home {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.9rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+  .home:hover { color: var(--accent); }
+  .home .invader {
+    width: 1.1rem; height: auto;
+    fill: currentColor;
+    shape-rendering: crispEdges;
+  }
+  .home .invader .f2 { opacity: 0; }
+  .home:hover .invader .f1 { animation: frame 0.5s steps(1) infinite; }
+  .home:hover .invader .f2 { animation: frame 0.5s steps(1) infinite reverse; }
+  @keyframes frame {
+    0%   { opacity: 1; }
+    50%  { opacity: 0; }
+  }
+
   h1 {
     font-size: clamp(1.5rem, 4vw, 1.9rem);
     font-weight: 600;
@@ -328,6 +357,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .tick::before, .tick-label { transition: none; }
+    .home:hover .invader .f1, .home:hover .invader .f2 { animation: none; }
   }
 </style>
 </head>
@@ -335,6 +365,15 @@
 <div class="wrap">
 
   <header>
+    {# The way back to adamwitwer.com. The homepage links here as "See the log";
+       this is the return trip, wearing the same space invader it uses. #}
+    <a class="home" href="/">
+      <svg class="invader" viewBox="0 0 11 8" aria-hidden="true" focusable="false">
+        <path class="f1" d="M2 0h1v1H2zM8 0h1v1H8zM3 1h1v1H3zM7 1h1v1H7zM2 2h7v1H2zM1 3h2v1H1zM4 3h3v1H4zM8 3h2v1H8zM0 4h11v1H0zM0 5h1v1H0zM2 5h7v1H2zM10 5h1v1h-1zM0 6h1v1H0zM2 6h1v1H2zM8 6h1v1H8zM10 6h1v1h-1zM3 7h2v1H3zM6 7h2v1H6z"/>
+        <path class="f2" d="M2 0h1v1H2zM8 0h1v1H8zM0 1h1v1H0zM3 1h1v1H3zM7 1h1v1H7zM10 1h1v1h-1zM0 2h1v1H0zM2 2h7v1H2zM10 2h1v1h-1zM0 3h3v1H0zM4 3h3v1H4zM8 3h3v1H8zM0 4h11v1H0zM1 5h9v1H1zM2 6h1v1H2zM8 6h1v1H8zM1 7h1v1H1zM9 7h1v1H9z"/>
+      </svg>
+      <span>adamwitwer.com</span>
+    </a>
     <h1>Watchlog</h1>
     <p class="blurb">
       What I've been watching, logged automatically from

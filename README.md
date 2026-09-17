@@ -121,6 +121,12 @@ Nothing new is exposed: the page has always shown every one of these fields to a
 looked. Hidden entries are excluded from both, because both are built from the same
 `group(db.visible_events())`.
 
+Above the title is a link back to **adamwitwer.com**, wearing the site's space invader —
+the return trip for the homepage's own "See the log" card. The mark is the same inline SVG
+the homepage uses in its footer, two frames swapped on hover so it marches, and it fills
+with `currentColor` so it takes the accent along with the text. It is the first tab stop on
+the page.
+
 The icon in the tab is the site's own space invader, `/assets/si.png`. The page has to
 name it explicitly: the root page's `<link>` uses a relative href, so nothing under
 `/watchlog/` inherits it, and there is no `/favicon.ico` at the root to fall back to. The

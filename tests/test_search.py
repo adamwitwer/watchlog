@@ -152,6 +152,14 @@ check("the script is inline, like everything else on this page",
 check("the icon points at the site's own, from a subdirectory",
       '<link rel="icon" href="/assets/si.png">' in html)
 
+# The homepage links here as "See the log"; this is the return trip. Both the
+# href and the mark matter: root-relative so it works from /watchlog/, and the
+# invader is the site's own, so the two pages read as one.
+check("the page links back to the site root",
+      '<a class="home" href="/">' in html)
+check("...wearing the homepage's space invader",
+      'class="invader"' in html and 'viewBox="0 0 11 8"' in html)
+
 
 # --- the two folds have to agree -------------------------------------------
 

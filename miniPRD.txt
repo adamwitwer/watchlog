@@ -594,3 +594,18 @@ RISKS AND OPEN QUESTIONS
     than an error: a missing suggestion costs fifteen seconds, a broken form costs the
     entry. TMDb's "Episode 7" placeholders are treated as no title, as the page already
     does.
+
+29. A way back to adamwitwer.com. The homepage was rebuilt (its own repo, ~/Documents/
+    Projects/adamwitwer.com) and links here with a "See the log" card; the log's only
+    route back was a bare text link in the footer, below 240 entries.
+
+    So: a link above the title, carrying the homepage's own space invader. Copied as
+    inline SVG rather than reinvented or pulled from /assets/si.png -- the homepage keeps
+    two frames and swaps them on hover so the thing marches, and that only works as
+    markup. It fills with currentColor, so one hover rule colours both the glyph and the
+    words. The site's AGENTS.md already says the palette came from Watchlog so the two
+    read as one site; this closes the loop in the other direction.
+
+    Checked in a browser against a copy of the real log, in both themes: muted grey at
+    rest, amber on hover in dark mode. It is also the first tab stop on the page, which
+    is where a "back" link belongs.
