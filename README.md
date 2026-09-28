@@ -360,6 +360,12 @@ Two things bound it, both learned by running it:
 `watchlog-backup.timer` copies it nightly to another machine in the house, over SSH with a
 key that exists only for this and is restricted to the Pi's addresses.
 
+**Where the copies live:** `adam@plex-mini.local:~/Backups/watchlog/`, one file per day
+named `watchlog-YYYY-MM-DD.db`. Re-running on the same day overwrites that day's file
+rather than piling up. At ~280KB each and `BACKUP_KEEP=14`, the whole set is about 4MB.
+Host, path and count are all set in `.env` (`BACKUP_HOST`, `BACKUP_PATH`, `BACKUP_KEEP`);
+`BACKUP_PATH` is relative to the login home directory on that machine.
+
 Three things make it a backup rather than a hope:
 
 - **SQLite's online backup API, not `cp`.** Both sensors write whenever something is
