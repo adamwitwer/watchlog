@@ -270,7 +270,25 @@ reconcile finding anything, since every row it recovers is one the webhook shoul
 delivered. A recovery more recent than the last live delivery turns the line red; a
 delivery after the last recovery means it came back.
 
+One line asks a different question: **is each service running the current code?** Every
+other line reports whether a thing is *running*, and a service running three-week-old code
+is running perfectly — it publishes, it answers, it records its heartbeat. It just quietly
+undoes whatever changed in between. The webhook and the Apple TV listener are long-lived
+processes that import the code once at startup, so a deploy that doesn't restart them
+leaves them publishing the old page forever. Each records when it started; the admin page
+compares that against the newest modification time among `watchlog/*.py` and names anything
+older. Only `.py` files count — Jinja reloads templates itself, which is part of why this
+was easy to miss.
+
+```
+● watchlog-webhook started before the code last changed — restart it
+```
+
 **Anything added here should carry a heartbeat from the start.**
+
+**And after deploying, restart the long-running services** — `watchlog-webhook`,
+`watchlog-appletv`, `watchlog-admin`. Reconcile and the backup are a fresh process each
+run and pick up changes on their own.
 
 ## Running it
 

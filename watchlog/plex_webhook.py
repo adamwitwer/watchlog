@@ -147,6 +147,7 @@ def main():
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     db.init()
+    db.record_start("watchlog-webhook")
     app.run(host="0.0.0.0", port=config.WEBHOOK_PORT)
 
 

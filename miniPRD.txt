@@ -663,3 +663,28 @@ RISKS AND OPEN QUESTIONS
     Set-up needed a key. The Pi had none that plex-mini accepted, so a dedicated ed25519
     key was generated for this and installed with from="<the Pi's two addresses>" plus
     no-pty and no forwarding, so it opens nothing else.
+
+32. Noticing a service running stale code. The evening the curly apostrophes shipped, Adam
+    looked at the log and found "You're Killing Me" straight on the page and curly in the
+    admin. Not a cache: the webhook had been running since 2026-09-08 and the listener
+    since 09-11, both predating the change. When he watched something that night the
+    webhook re-rendered and republished from the grouping.py it had imported three weeks
+    earlier, and the change came quietly undone. Nothing failed. The publish succeeded.
+
+    My own verification missed it because I published by hand from a fresh process, which
+    is precisely the case that cannot reproduce the bug.
+
+    Two candidate fixes: a deploy script, or a detector. Chose the detector, because the
+    failure was not a bad deploy -- it was a correct deploy verified in a way that could
+    not see the difference, and a script is still discipline. The rest of this project
+    already bets on sensors over discipline: reconcile does not trust the webhook, the
+    heartbeat does not trust the poll, the sweep does not trust the history.
+
+    Each long-running service records its start time; the admin page compares that with
+    the newest mtime among watchlog/*.py and names anything older. No git dependency, so
+    an uncommitted edit counts too. Templates deliberately excluded: Jinja reloads them on
+    change, so a stale process still renders the newest markup -- which is a large part of
+    why this was invisible.
+
+    The deploy script is still worth having and is not built yet. The README now at least
+    says to restart the long-running services.

@@ -362,6 +362,7 @@ def main():
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     db.init()
+    db.record_start("watchlog-appletv")
     asyncio.run(Collector().run())
 
 

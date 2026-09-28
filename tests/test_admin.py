@@ -183,7 +183,7 @@ labels = [b["label"] for b in admin._health()]
 check("every part of the chain gets a line, in the order the chain runs",
       labels == ["Plex webhook", "Apple TV listener polled",
                  "Last reconcile", "Last library sweep", "Last publish",
-                 "Last backup"])
+                 "Last backup", "Running code"])
 check("with nothing recorded, each one reads as unknown rather than fine",
       all(b["state"] == "unknown" for b in admin._health()))
 
@@ -557,6 +557,66 @@ client.delete_cookie("watchlog_admin")
 check("the pre-filled page 404s without a token",
       client.get(f"/?next={first_id}").status_code == 404)
 client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
+
+
+# --- running the current code ------------------------------------------------
+# The question none of the other lines can ask. A service running three-week-old
+# code is running perfectly: it publishes, it answers, it records its heartbeat.
+# It just quietly undoes whatever changed in between.
+
+from datetime import timedelta                                  # noqa: E402
+
+print('\nrunning the current code')
+
+changed = admin._code_changed_at()
+
+
+def started_at(when, units=None):
+    for unit, key in config.META_STARTED.items():
+        if units is None or unit in units:
+            db.set_meta(key, when.isoformat())
+
+
+started_at(changed + timedelta(minutes=5))
+beat = admin._code_beat()
+check("services started after the last edit read ok", beat["state"] == "ok")
+check("...and say so plainly", "current code" in beat["text"])
+
+started_at(changed - timedelta(days=3), {"watchlog-webhook"})
+beat = admin._code_beat()
+check("a service older than the code is flagged", beat["state"] == "stale")
+check("...and named, so you know which one to restart",
+      "watchlog-webhook" in beat["text"])
+check("...with the instruction, singular", beat["text"].endswith("restart it"))
+
+started_at(changed - timedelta(days=1), {"watchlog-appletv"})
+beat = admin._code_beat()
+check("two stale services are both named",
+      "watchlog-appletv" in beat["text"] and "watchlog-webhook" in beat["text"])
+check("...and the instruction turns plural", beat["text"].endswith("restart them"))
+
+with db.connect() as conn:
+    conn.execute("DELETE FROM meta")
+beat = admin._code_beat()
+check("a service that never reported reads unknown rather than fine",
+      beat["state"] == "unknown")
+
+db.record_start("watchlog-admin")
+check("a service records its start when it boots",
+      db.get_meta(config.META_STARTED["watchlog-admin"]) is not None)
+check("an unrecognised unit is ignored rather than crashing a boot",
+      db.record_start("watchlog-nonexistent") is None)
+
+# The reason only .py files count: Jinja reloads templates on change by itself,
+# so a stale process still renders the newest markup -- which is exactly what
+# made this failure so quiet.
+check("only Python files decide whether the code has moved",
+      admin._code_changed_at() == max(
+          (__import__("datetime").datetime.fromtimestamp(f.stat().st_mtime,
+                                                         __import__("datetime").timezone.utc)
+           for f in (config.ROOT / "watchlog").glob("*.py"))))
+
+started_at(changed + timedelta(minutes=5))
 
 
 # --- the page itself -------------------------------------------------------

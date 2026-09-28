@@ -175,6 +175,21 @@ META_BACKUP_OK = "backup_ok_at"
 META_BACKUP_ERROR = "backup_error"
 META_BACKUP_ERROR_AT = "backup_error_at"
 
+# Each long-running service notes when it started, so the admin page can spot
+# one still running code from before the last deploy. On 2026-09-27 the webhook
+# had been up since the 8th; a change to how titles are rendered went out, the
+# next play made the webhook republish the page from the code it loaded three
+# weeks earlier, and the change silently came undone. Nothing failed, so
+# nothing said anything.
+#
+# Only the long-running ones. Reconcile, the sweep and the backup are a fresh
+# process every time and cannot be stale.
+META_STARTED = {
+    "watchlog-webhook": "started_webhook",
+    "watchlog-appletv": "started_appletv",
+    "watchlog-admin": "started_admin",
+}
+
 # Episode titles are listed for a night up to this many episodes, then withheld
 # so a long binge doesn't turn one scannable line into a paragraph. Measured
 # against real data: 229 of 231 entries are three episodes or fewer.

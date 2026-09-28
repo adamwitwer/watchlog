@@ -22,6 +22,7 @@ import hmac
 import logging
 import re
 from datetime import datetime, time, timezone
+from pathlib import Path
 
 from flask import (Flask, make_response, redirect, render_template,
                    request, url_for)
@@ -160,6 +161,52 @@ def _webhook_beat():
             "error": None, "error_ago": None}
 
 
+def _code_changed_at():
+    """When the code the services are running was last edited.
+
+    Only `.py` files. Jinja reloads templates on change by itself, which is
+    part of why a stale process is easy to miss: edit the template and the page
+    updates, edit grouping.py and it does not.
+    """
+    newest = max((path.stat().st_mtime
+                  for path in (config.ROOT / "watchlog").glob("*.py")),
+                 default=0)
+    return datetime.fromtimestamp(newest, timezone.utc)
+
+
+def _code_beat():
+    """Whether anything is still running code from before the last change.
+
+    The question the other lines cannot ask. Every one of them reports on
+    whether a thing is *running*, and a service running three-week-old code is
+    running perfectly -- it publishes, it answers, it records its heartbeat. It
+    just quietly undoes whatever changed in between, which is how the curly
+    apostrophes came back straight the same evening they went out.
+    """
+    changed = _code_changed_at()
+    stale, silent = [], []
+    for unit, key in config.META_STARTED.items():
+        started = db.get_meta(key)
+        if not started:
+            silent.append(unit)
+        elif _at(started) < changed:
+            stale.append(unit)
+
+    if stale:
+        names = ", ".join(sorted(stale))
+        return {"label": "Running code", "state": "stale",
+                "text": f"{names} started before the code last changed"
+                        f" — restart {'it' if len(stale) == 1 else 'them'}",
+                "error": None, "error_ago": None}
+    if silent:
+        return {"label": "Running code", "state": "unknown",
+                "text": f"{', '.join(sorted(silent))} has not said when it started.",
+                "error": None, "error_ago": None}
+    return {"label": "Running code", "state": "ok",
+            "text": "Every service is running the current code",
+            "error": None, "error_ago": None}
+
+
 def _health():
     """The chain: both sensors, both safety nets, the way out, the way back."""
     return [
@@ -183,6 +230,9 @@ def _health():
         _beat("Last backup", config.META_BACKUP_OK,
               config.BACKUP_STALE_AFTER_HOURS * 3600, "it runs nightly",
               config.META_BACKUP_ERROR, config.META_BACKUP_ERROR_AT),
+        # Not about whether something is running, but about *what* it is
+        # running -- the one way everything above can be green and still wrong.
+        _code_beat(),
     ]
 
 
@@ -542,6 +592,7 @@ def main():
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     db.init()
+    db.record_start("watchlog-admin")
     app.run(host="0.0.0.0", port=config.ADMIN_PORT)
 
 

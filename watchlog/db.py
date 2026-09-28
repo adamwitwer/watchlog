@@ -118,6 +118,22 @@ def set_meta(key, value):
         )
 
 
+def record_start(unit):
+    """Note when a long-running service started.
+
+    Read back by the admin page against the code's own modification time, so a
+    process running yesterday's code is visible rather than merely possible.
+    """
+    from datetime import datetime, timezone
+    key = config.META_STARTED.get(unit)
+    if not key:
+        return
+    try:
+        set_meta(key, datetime.now(timezone.utc).isoformat())
+    except Exception:
+        log.exception("could not record start for %s", unit)
+
+
 def get_meta(key, default=None):
     with connect() as conn:
         row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
