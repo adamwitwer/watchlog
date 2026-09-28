@@ -37,6 +37,14 @@ web host. The only public surface is that flat file.
 - **Grouping** — episodes collapse into one entry per show per night, with the day rolling
   over at `NIGHT_ROLLOVER_HOUR`. Six lines for one evening's bingeing would bury
   everything else on a page built around large type. Movies stay individual.
+- **Typography** — straight apostrophes become curly ones on the way to the page and the
+  feed. Sources disagree: Plex sends `Bob's`, while Apple's metadata and anything typed on
+  a Mac send `Bob’s`, and the mixture reads as sloppiness on a page built around large
+  type. Apostrophes only — directional quotation marks and dashes need to know what they
+  are joining, and that is a parser with real failure modes. It happens at display time,
+  so the database keeps what each source actually sent, and nothing downstream can notice:
+  both marks are deleted by the search fold and stripped by `normalize()`, so search
+  results and dedup keys are identical either way.
 - **Enrichment** — TMDb resolves titles that arrive without ids into IMDb ids and years,
   cached per title. A `locked` flag pins a hand-corrected match so the enricher leaves it
   alone. The same module also learns how many episodes each watched season has, which is

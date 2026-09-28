@@ -26,7 +26,7 @@ import statistics
 from collections import Counter, defaultdict
 
 from . import config, db
-from .grouping import night_of, normalize
+from .grouping import curly_apostrophes, night_of, normalize
 
 
 def _pace(gaps, episodes):
@@ -121,7 +121,9 @@ def show_seasons(events=None, today=None):
         quiet = (today - nights[-1]).days if today else 0
 
         records.append({
-            "title": bucket["names"].most_common(1)[0][0],
+            # Same typography as the entries, so the two halves of the feed
+            # never spell one show's name two ways.
+            "title": curly_apostrophes(bucket["names"].most_common(1)[0][0]),
             "imdb_id": imdb_id,
             "season": season,
             "episodes_watched": watched,

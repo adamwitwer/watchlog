@@ -96,5 +96,37 @@ edited = group([row(id=9, title="Silo", season=2, episode=4,
 check("once typed in by hand, it reads like a Plex entry",
       edited[0]["detail"] == "S2 E4" and edited[0]["episode_names"] == "Descent")
 
+# --- typography --------------------------------------------------------------
+# Plex sends straight apostrophes; Apple's metadata and anything typed on a Mac
+# send curly ones. The display side settles it, without touching the keys that
+# decide what counts as the same show.
+
+from watchlog.grouping import curly_apostrophes, normalize    # noqa: E402
+
+show = group([row(id=11, title="Bob's Burgers",
+                  episode_title="Don't Stop Be-Leaf-ing")])
+check("a straight apostrophe in a title is curled for display",
+      show[0]["title"] == "Bob\u2019s Burgers")
+check("...and in an episode title too",
+      show[0]["episode_names"] == "Don\u2019t Stop Be-Leaf-ing")
+
+film = group([row(id=12, title="If I Had Legs I'd Kick You", media_type="movie",
+                  season=None, episode=None, episode_title=None)])
+check("a film gets the same treatment",
+      film[0]["title"] == "If I Had Legs I\u2019d Kick You")
+
+check("an elision keeps its leading mark, curled as well",
+      curly_apostrophes("'Salem's Lot") == "\u2019Salem\u2019s Lot")
+check("a title with nothing to fix is left alone",
+      curly_apostrophes("Reacher") == "Reacher")
+check("None passes through, because episode_names can return it",
+      curly_apostrophes(None) is None)
+
+# Why this is safe to do at all: identity is computed from the raw row, and
+# both forms normalise to the same key regardless.
+check("both forms share one key, so dedup and title matching cannot notice",
+      normalize("Bob's Burgers") == normalize("Bob\u2019s Burgers"))
+
+
 print(f"\n{'ALL PASS' if not failures else str(len(failures)) + ' FAILED: ' + ', '.join(failures)}")
 sys.exit(1 if failures else 0)

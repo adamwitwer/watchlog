@@ -609,3 +609,27 @@ RISKS AND OPEN QUESTIONS
     Checked in a browser against a copy of the real log, in both themes: muted grey at
     rest, amber on hover in dark mode. It is also the first tab stop on the page, which
     is where a "back" link belongs.
+
+30. Curly apostrophes, everywhere the log is displayed. Adam asked for it as "one idea for
+    a very small improvement", and the measurement flipped the assumption behind it: this
+    is not hand-typed versus automatic. Plex sends straight apostrophes (4 titles, 21
+    episode titles), while Apple's metadata and anything typed on a Mac send curly ones
+    (1 and 2). Plex is the odd one out and it is most of the page.
+
+    Done at display time rather than on write. Typography is a display concern, the
+    database goes on holding what each source actually sent, and there is no migration of
+    the existing rows and so no chance of disturbing a dedup key. Applied in group() and
+    in stats.show_seasons, so the page, the feed's entries and the feed's shows block
+    cannot spell one show two ways.
+
+    Safe because of two things already true, both checked rather than assumed:
+    search_normalize and the template's fold() delete either mark before comparing, and
+    normalize() strips everything non-alphanumeric, so identity is unchanged. The parity
+    corpus already carried both "Bob's Burgers" and "Bob’s"; a test now states the
+    property directly.
+
+    Apostrophes only. Directional quotation marks need to know whether each mark opens or
+    closes and dashes need to know what they join; both are real parsers with real failure
+    modes. An apostrophe is the one case where replacing every straight mark is right
+    essentially always -- including elisions like "'Salem's Lot", where the leading mark
+    is an apostrophe too and comes out correct for free.

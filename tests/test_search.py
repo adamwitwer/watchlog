@@ -59,6 +59,13 @@ check("nothing in, nothing out",
       search_normalize("") == "" and search_normalize(None) == "")
 
 
+# The property the display-side curling depends on: whichever mark a source
+# sent, the filter cannot tell. Without this, curling Plex's titles would have
+# quietly changed what typing an apostrophe finds.
+check("straight and curly apostrophes fold to the same thing",
+      search_normalize("Bob's Burgers") == search_normalize("Bob\u2019s Burgers"))
+
+
 # --- what a row offers the filter ------------------------------------------
 
 print("\nsearch keys")

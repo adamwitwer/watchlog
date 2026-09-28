@@ -10,6 +10,26 @@ from datetime import datetime, timedelta
 from .config import EPISODE_TITLES_MAX, NIGHT_ROLLOVER_HOUR
 
 
+def curly_apostrophes(text):
+    """Straight apostrophes to typographic ones, for anything displayed.
+
+    Sources disagree: Plex sends "Bob's", while Apple's metadata and anything
+    typed on a Mac send "Bob’s". On a page built around large type that
+    reads as sloppiness, so the display side settles it one way.
+
+    Only apostrophes. Directional quotation marks need to know whether each
+    one opens or closes, and dashes need to know what they join; both are real
+    parsers with real failure modes. An apostrophe is the case where replacing
+    every straight mark is right essentially always -- including elisions like
+    "'Salem's Lot", where the leading mark is an apostrophe too.
+
+    Nothing downstream sees the difference: search_normalize and the template's
+    fold() both delete either form before comparing, and normalize() below
+    strips everything non-alphanumeric, so dedup keys are identical either way.
+    """
+    return text.replace("'", "’") if text else text
+
+
 def normalize(title):
     """A loose key for matching the same show across sources and spellings."""
     text = (title or "").lower().strip()
@@ -110,7 +130,7 @@ def group(rows):
             entries.append({
                 "ids": [row["id"]],
                 "watched_at": row["watched_at"],
-                "title": row["title"],
+                "title": curly_apostrophes(row["title"]),
                 "detail": None,
                 "episode_names": None,
                 "year": row["year"],
@@ -129,9 +149,9 @@ def group(rows):
         entries.append({
             "ids": [r["id"] for r in rows_in_bucket],
             "watched_at": newest["watched_at"],
-            "title": newest["title"],
+            "title": curly_apostrophes(newest["title"]),
             "detail": episode_label(rows_in_bucket),
-            "episode_names": episode_names(rows_in_bucket),
+            "episode_names": curly_apostrophes(episode_names(rows_in_bucket)),
             "year": newest["year"],
             "service": newest["service"],
             "imdb_id": next((r["imdb_id"] for r in rows_in_bucket if r["imdb_id"]), None),
