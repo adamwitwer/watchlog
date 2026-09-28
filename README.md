@@ -286,9 +286,11 @@ was easy to miss.
 
 **Anything added here should carry a heartbeat from the start.**
 
-**And after deploying, restart the long-running services** — `watchlog-webhook`,
-`watchlog-appletv`, `watchlog-admin`. Reconcile and the backup are a fresh process each
-run and pick up changes on their own.
+**Deploying is `./deploy.sh` on the Pi**, which exists because of that failure: it pulls,
+runs every suite, copies any changed unit files, restarts the long-running services,
+republishes, and prints the health lines. Reconcile and the backup are a fresh process
+each run and need no restart. `--no-pull` deploys the working tree as it stands;
+`--no-tests` skips the suites.
 
 ## Running it
 
@@ -303,6 +305,7 @@ Five systemd units on the Pi, all enabled at boot:
 | `watchlog-backup.timer` | nightly copy of the database to another machine |
 
 ```
+./deploy.sh                                             # pull, test, restart, publish
 python -m watchlog.plex_history --reconcile --dry-run   # what the timer would import
 python -m watchlog.plex_history --sweep --dry-run       # what the library says is missing
 python -m watchlog.render                               # render without publishing
