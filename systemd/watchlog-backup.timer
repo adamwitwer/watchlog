@@ -1,0 +1,14 @@
+[Unit]
+Description=Nightly Watchlog backup
+
+[Timer]
+# Late enough to be after the night's watching, so the copy includes it.
+OnCalendar=*-*-* 03:30:00
+# Persistent, because the machine this copies to is a Mac that can be asleep
+# or away: a missed night should run at the next opportunity rather than be
+# skipped silently until tomorrow.
+Persistent=true
+RandomizedDelaySec=20min
+
+[Install]
+WantedBy=timers.target

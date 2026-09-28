@@ -161,7 +161,7 @@ def _webhook_beat():
 
 
 def _health():
-    """The chain, in order: both sensors, both safety nets, the way out."""
+    """The chain: both sensors, both safety nets, the way out, the way back."""
     return [
         _webhook_beat(),
         _beat("Apple TV listener polled", config.META_APPLETV_OK,
@@ -178,6 +178,11 @@ def _health():
         # week is not a fault. Only a failed attempt is.
         _beat("Last publish", config.META_PUBLISH_OK, None, None,
               config.META_PUBLISH_ERROR, config.META_PUBLISH_ERROR_AT),
+        # Last, because it is the only line here about the day everything else
+        # is gone. Given twice its cadence before it counts as late.
+        _beat("Last backup", config.META_BACKUP_OK,
+              config.BACKUP_STALE_AFTER_HOURS * 3600, "it runs nightly",
+              config.META_BACKUP_ERROR, config.META_BACKUP_ERROR_AT),
     ]
 
 

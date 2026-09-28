@@ -231,6 +231,11 @@ silent when idle. Most of them have failed silently at least once.
   exception and carry on — only reconcile lets it propagate — so a web host that had
   stopped accepting the file would leave everything on the Pi looking perfect while the
   live page quietly went stale.
+- **Nothing was copying the database anywhere.** Found on 2026-09-27: the page and the
+  feed are rendered output, the code is in git, and Plex keeps its own history — but the
+  Apple TV keeps none, hand-typed entries exist nowhere else, the record of what was
+  *deleted* is by definition unpublished, and all of it sat on an SD card, which is a
+  wear-out part.
 - **The library sweep** rides on the reconcile timer once a day, and is the only thing
   that can see an episode marked watched rather than played. Its own silence would be
   indistinguishable from there being nothing to find.
@@ -243,6 +248,7 @@ So each of them records what happened, and the admin page reads it back:
 ● Last reconcile 18 minutes ago
 ● Last library sweep 3 hours ago
 ● Last publish 18 minutes ago
+● Last backup 7 hours ago
 ```
 
 A line goes red two ways, and they are not the same thing:
@@ -268,7 +274,7 @@ delivery after the last recovery means it came back.
 
 ## Running it
 
-Four systemd units on the Pi, all enabled at boot:
+Five systemd units on the Pi, all enabled at boot:
 
 | unit | what it does |
 | --- | --- |
@@ -276,6 +282,7 @@ Four systemd units on the Pi, all enabled at boot:
 | `watchlog-appletv.service` | holds the `pyatv` connection |
 | `watchlog-admin.service` | the private admin page |
 | `watchlog-reconcile.timer` | hourly catch-up against Plex history; also refreshes TMDb season lengths, and sweeps the Plex library once a day |
+| `watchlog-backup.timer` | nightly copy of the database to another machine |
 
 ```
 python -m watchlog.plex_history --reconcile --dry-run   # what the timer would import
@@ -346,6 +353,38 @@ Two things bound it, both learned by running it:
   Anything the sweep is told not to take is imported *hidden* — a decision the sweep
   already respects, since it never resurrects a hidden row, and one the admin page can
   undo. Leaving it out instead would mean being offered it again every day forever.
+
+## The backup
+
+`watchlog.db` is the only thing here that cannot be rebuilt, and it lives on an SD card.
+`watchlog-backup.timer` copies it nightly to another machine in the house, over SSH with a
+key that exists only for this and is restricted to the Pi's addresses.
+
+Three things make it a backup rather than a hope:
+
+- **SQLite's online backup API, not `cp`.** Both sensors write whenever something is
+  watched, and copying the file out from under a writer can capture a half-finished
+  transaction.
+- **`PRAGMA integrity_check` before it is sent**, and a copy that fails is deleted rather
+  than shipped. A backup nobody can restore is worse than an obvious absence, because it
+  stops you looking.
+- **The arriving file's checksum is compared to the local one**, so a truncated transfer
+  is caught now and not on the day it is needed.
+
+It keeps `BACKUP_KEEP` copies and carries a heartbeat like everything else, so a backup
+that quietly stopped shows up red rather than being discovered when it is too late.
+
+Deliberately **not** the web host: this file holds the entries deleted from the published
+page, and anywhere public would undo the deleting. It is also one house — this covers the
+card wearing out, not a fire.
+
+To restore, stop the writers, put the file back, and start them again:
+
+```bash
+sudo systemctl stop watchlog-webhook watchlog-appletv
+scp adam@plex-mini.local:Backups/watchlog/watchlog-2026-09-27.db ~/Projects/watchlog/watchlog.db
+sudo systemctl start watchlog-webhook watchlog-appletv
+```
 
 ## Known limits
 

@@ -120,6 +120,22 @@ SWEEP_EVERY_HOURS = 24
 # session for, going back years.
 SWEEP_SINCE = _get("WATCHLOG_SWEEP_SINCE", "")
 
+# --- keeping a copy off the Pi -----------------------------------------------
+# The database is the one thing here that cannot be rebuilt. The page and the
+# feed can be re-rendered, the code is in git, and Plex remembers its own
+# history -- but the Apple TV keeps none, hand-typed entries exist nowhere
+# else, and the record of what was deleted is by definition not published.
+# It lives on an SD card, which is a wear-out part.
+#
+# Deliberately not the web host: the database holds the entries that were
+# deleted from the page, and putting it anywhere public would republish
+# exactly what deleting them was meant to undo.
+BACKUP_HOST = _get("BACKUP_HOST", "")
+BACKUP_PATH = _get("BACKUP_PATH", "Backups/watchlog")
+BACKUP_SSH_KEY = _get("BACKUP_SSH_KEY", "")
+BACKUP_KEEP = int(_get("BACKUP_KEEP", "14"))
+BACKUP_STALE_AFTER_HOURS = 48
+
 # The timer runs hourly, so anything past this means it has missed a turn and
 # the admin page should say so in red rather than stay quietly reassuring.
 RECONCILE_STALE_AFTER_HOURS = 2
@@ -154,6 +170,10 @@ META_WEBHOOK_MISSED = "webhook_missed_count"
 META_SWEEP_OK = "sweep_ok_at"
 META_SWEEP_FOUND = "sweep_found_count"
 META_SWEEP_FOUND_AT = "sweep_found_at"
+
+META_BACKUP_OK = "backup_ok_at"
+META_BACKUP_ERROR = "backup_error"
+META_BACKUP_ERROR_AT = "backup_error_at"
 
 # Episode titles are listed for a night up to this many episodes, then withheld
 # so a long binge doesn't turn one scannable line into a paragraph. Measured

@@ -633,3 +633,33 @@ RISKS AND OPEN QUESTIONS
     modes. An apostrophe is the one case where replacing every straight mark is right
     essentially always -- including elisions like "'Salem's Lot", where the leading mark
     is an apostrophe too and comes out correct for free.
+
+31. A backup, at last. Checking for one on 2026-09-27 found nothing: the only backup job
+    on the Pi was dpkg-db-backup, which is Debian's own package list. watchlog.db -- 450
+    events, a year of history -- sat on /dev/mmcblk0p2, an SD card, with nothing copying
+    it anywhere.
+
+    What would actually have been lost is narrower than it sounds, and worth writing down:
+    the published watchlog.json is an accidental offsite copy of the *visible* log. What
+    it does not hold is every deleted entry, the raw payloads, the pinned title matches,
+    and the Apple TV plays -- which exist in no other system at all, because the device
+    keeps no history.
+
+    Nightly to plex-mini, chosen over the web host for the same reason the database is
+    gitignored: it holds what was deleted from the page, and anywhere public would undo
+    the deleting. Same house, so this covers the card wearing out and not a fire.
+
+    Three details are the whole point. The copy goes through sqlite3's online backup API
+    rather than cp, because both sensors write whenever something is watched. It is
+    checked with PRAGMA integrity_check before being sent, and a failed check deletes it
+    rather than shipping it -- a backup that cannot be restored is worse than none,
+    because it stops you looking. And the checksum of what arrived is compared with what
+    was sent, so a truncated transfer is noticed now rather than on the day it matters.
+
+    Its own timer rather than riding on reconcile: reconcile was down for 27 hours earlier
+    the same day, and a backup should not share a failure domain with the thing most
+    likely to break. Persistent=true because the target is a Mac that can be asleep.
+
+    Set-up needed a key. The Pi had none that plex-mini accepted, so a dedicated ed25519
+    key was generated for this and installed with from="<the Pi's two addresses>" plus
+    no-pty and no forwarding, so it opens nothing else.

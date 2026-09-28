@@ -182,7 +182,8 @@ clear_meta()
 labels = [b["label"] for b in admin._health()]
 check("every part of the chain gets a line, in the order the chain runs",
       labels == ["Plex webhook", "Apple TV listener polled",
-                 "Last reconcile", "Last library sweep", "Last publish"])
+                 "Last reconcile", "Last library sweep", "Last publish",
+                 "Last backup"])
 check("with nothing recorded, each one reads as unknown rather than fine",
       all(b["state"] == "unknown" for b in admin._health()))
 
