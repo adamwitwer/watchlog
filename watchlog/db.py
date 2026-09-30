@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS events (
     -- bit, given sparingly, is the only thing here that carries real judgement
     -- rather than inferred behaviour.
     standout        INTEGER NOT NULL DEFAULT 0,
+    -- Why it stood out, in his own words. The mark alone ages badly: a year on
+    -- it says *that* an episode was the one and nothing about what made it.
+    standout_note   TEXT,
     raw             TEXT
 );
 
@@ -99,6 +102,7 @@ def connect():
 ADDED_COLUMNS = [
     ("seasons", "airing", "INTEGER NOT NULL DEFAULT 0"),
     ("events", "standout", "INTEGER NOT NULL DEFAULT 0"),
+    ("events", "standout_note", "TEXT"),
 ]
 
 
@@ -387,15 +391,25 @@ def dedup_keys():
                 conn.execute("SELECT DISTINCT dedup_key FROM events")}
 
 
-def set_standout(event_id, standout=True):
+def set_standout(event_id, standout=True, note=None):
     """Mark one episode or film as a standout, or take the mark back.
 
     One event, not a night: on a night of two episodes it is usually one of
     them that was the one, and saying which is the entire point.
+
+    The note survives un-marking. Un-marking is one click and writing is not,
+    so a mis-click must not be able to destroy the only sentence in this
+    database that someone actually composed. Pass note=None to leave whatever
+    is stored alone.
     """
     with connect() as conn:
-        conn.execute("UPDATE events SET standout = ? WHERE id = ?",
-                     (1 if standout else 0, event_id))
+        if note is None:
+            conn.execute("UPDATE events SET standout = ? WHERE id = ?",
+                         (1 if standout else 0, event_id))
+        else:
+            conn.execute(
+                "UPDATE events SET standout = ?, standout_note = ? WHERE id = ?",
+                (1 if standout else 0, note.strip()[:500] or None, event_id))
 
 
 def set_hidden(event_ids, hidden=True):

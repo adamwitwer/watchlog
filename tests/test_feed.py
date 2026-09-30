@@ -229,6 +229,15 @@ check("a marked episode marks the night it was watched on",
 check("other nights are untouched",
       sum(1 for e in marked["entries"] if e["standout"]) == 1)
 
+check("an entry with no note says so rather than inventing one",
+      industry_entry["standout_note"] is None)
+
+db.set_standout(one, True, "The scene between Chandler and Macdonald.")
+noted = json.loads(render.build_json()[0])
+check("the note travels with the entry into the feed",
+      next(e for e in noted["entries"] if e["title"] == "Industry")["standout_note"]
+      == "The scene between Chandler and Macdonald.")
+
 industry_show = next(s for s in marked["shows"] if s["title"] == "Industry")
 check("the season carries a count, so a show can be ranked by them",
       industry_show["standouts"] == 1)

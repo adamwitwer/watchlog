@@ -714,3 +714,22 @@ RISKS AND OPEN QUESTIONS
     behaviour lied about Blue Lights, where a co-viewed show's cadence was set by two
     diaries rather than by how good it was. The feed carries a per-season count so shows
     can be ranked on it.
+
+34. A note on a standout. Suggested after Adam wrote a friend a paragraph about why
+    Lanterns S1E7 was the one: the mark alone ages badly -- a year on it says *that* an
+    episode stood out and nothing about what made it, and the answer already existed in
+    prose somewhere else.
+
+    A text field beside each episode's toggle. Stored on the event, shown under the entry
+    as an aside with the same accent rule the margin mark uses, so the two read as one
+    gesture. Included in the search key, so typing a word from the note reaches the episode
+    -- "sinestro" finds it.
+
+    The note survives un-marking. Un-marking is one click and writing is not, so a misclick
+    must not be able to destroy the only sentence in this database that someone actually
+    composed; re-marking brings it back. Clearing it is possible but has to be deliberate.
+
+    Caught by looking at the rendered page rather than the tests: the note skipped the
+    apostrophe curling, so "Hal's" would have put the first straight apostrophe back on a
+    page that has none. It is the most likely source of one, being the only hand-typed
+    prose there.

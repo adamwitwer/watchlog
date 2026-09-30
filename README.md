@@ -77,6 +77,11 @@ where they're known, the episode title, the date, the service, and a link to IMD
   of them; one bit, given sparingly, is the only thing in the log that is a *judgement*
   rather than something a sensor observed. Typing `standout` in the filter collects them.
   On a narrow screen there is no margin to hang it in, so it joins the line instead.
+  A standout can carry a **note** — why it was the one — shown under the entry as an aside
+  with the same accent rule down its left. It is the only prose on the page written by a
+  person rather than assembled from a sensor, and it is searchable, so typing `sinestro`
+  reaches the episode worth writing that down about. The note survives un-marking, because
+  un-marking is one click and writing is not.
 - **Month markers** — a heavier rule and a small label where one month becomes the next.
   The rail has always known where the boundaries are; the list itself said nothing, so
   scrolling a year of entries you had to read dates to find out. A rule rather than a
@@ -118,7 +123,7 @@ that happened, and it is what the page draws one line for. Each entry carries th
 `date` (the same one the page prints, so filtering a quarter needs no reasoning about time
 zones), the raw `watched_at` beside it, `title`, `media_type`, `detail` (`S3 E4-E6`),
 `season` and `episode_count` broken out so nothing has to parse that label back apart,
-`episode_titles`, `year`, `service`, `imdb_id`, and `standout`. Films carry `null` for `season` and
+`episode_titles`, `year`, `service`, `imdb_id`, `standout` and `standout_note`. Films carry `null` for `season` and
 `episode_count` — a film has no episodes, and saying `1` invites something downstream to
 add them up. A night that crosses a season boundary carries `null` too, because there is
 no single honest answer.
@@ -202,8 +207,8 @@ internet. It can:
   nothing and Add is still where duplicates get refused. Built for the series no sensor
   can see — Netflix, mostly — where each episode used to mean typing the same show again
 - **mark a standout** — one episode, not the night: on an evening of two it is usually one
-  of them that was the one, and saying which is the point. A toggle per episode, since
-  un-marking should be as easy as marking
+  of them that was the one, and saying which is the point. A toggle per episode, with a
+  note field beside it; the note is kept even when the mark is taken back
 - **fix a title** — a show spelled two ways is two shows to anything that counts them, and
   until this existed the title was the one field on an entry with no way to correct it.
   Renames every spelling that shares the normalised key, but only within the same media

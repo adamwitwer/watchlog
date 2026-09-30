@@ -74,7 +74,7 @@ print("\nsearch keys")
 def entry(**over):
     base = {"title": "Severance", "detail": "S2 E1-E3",
             "episode_names": "Hello, Ms. Cobel", "service": "Apple TV",
-            "year": 2022, "standout": False}
+            "year": 2022, "standout": False, "standout_note": None}
     base.update(over)
     return base
 
@@ -90,6 +90,11 @@ check("a standout is findable by typing the word",
       "standout" in _search_key(entry(standout=True)))
 check("...and nothing else claims to be one",
       "standout" not in _search_key(entry()))
+# The reason is findable too: typing a word from the note reaches the episode
+# that was worth writing it down about.
+check("what he wrote about it is searchable",
+      "sinestro" in _search_key(entry(standout=True,
+                                      standout_note="Sinestro as the reveal")))
 check("the year is deliberately not, or every 2022 film would match",
       "2022" not in key)
 

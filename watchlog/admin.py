@@ -423,8 +423,13 @@ def standout():
         return redirect(url_for("index", error="which entry?"))
 
     on = request.form.get("on") == "1"
-    db.set_standout(event_id, on)
-    log.info("%s event %s as a standout", "marked" if on else "unmarked", event_id)
+    # The field is always on the form, so "" means "cleared" rather than
+    # "unspecified" -- but un-marking posts whatever is in the box, which keeps
+    # the writing through a mis-click.
+    note = request.form.get("note")
+    db.set_standout(event_id, on, note)
+    log.info("%s event %s as a standout%s", "marked" if on else "unmarked",
+             event_id, " with a note" if (note or "").strip() else "")
     _republish()
     return redirect(url_for("index"))
 

@@ -471,6 +471,40 @@ check("the toggle is offered on every entry", 'action="/standout"' in page)
 check("a marked entry says so in its summary", "Standout ✦" in page)
 client.post("/standout", data={"id": str(target), "on": "0"})
 
+# The note: the only thing in this database a person actually composed, so the
+# rules around losing it matter more than the rules around setting it.
+NOTE = "  Sinestro as the reveal, and that damn box.  "
+client.post("/standout", data={"id": str(target), "on": "1", "note": NOTE})
+check("a note is stored with the mark",
+      rows(SHOW)[0]["standout_note"] == NOTE.strip())
+
+client.post("/standout", data={"id": str(target), "on": "0", "note": NOTE})
+check("un-marking keeps the writing, because un-marking is one click and "
+      "writing is not", rows(SHOW)[0]["standout_note"] == NOTE.strip())
+check("...even though the mark itself is gone", rows(SHOW)[0]["standout"] == 0)
+
+client.post("/standout", data={"id": str(target), "on": "1", "note": NOTE})
+check("re-marking brings the note back with it",
+      rows(SHOW)[0]["standout"] == 1
+      and rows(SHOW)[0]["standout_note"] == NOTE.strip())
+
+client.post("/standout", data={"id": str(target), "on": "1", "note": "   "})
+check("a note cleared on purpose is cleared",
+      rows(SHOW)[0]["standout_note"] is None)
+
+client.post("/standout", data={"id": str(target), "on": "1", "note": "x" * 900})
+check("an overlong note is capped rather than refused",
+      len(rows(SHOW)[0]["standout_note"]) == 500)
+
+client.post("/standout", data={"id": str(target), "on": "1", "note": NOTE})
+page = client.get("/").get_data(as_text=True)
+check("the note comes back pre-filled, so editing is not retyping",
+      'value="%s"' % NOTE.strip() in page)
+check("both buttons are offered once something is marked",
+      'value="0">Unmark' in page and 'value="1">Save' in page)
+
+client.post("/standout", data={"id": str(target), "on": "0", "note": ""})
+
 
 # --- renaming a show --------------------------------------------------------
 # A show spelled two ways is two shows to anything that counts them. The fix

@@ -108,6 +108,10 @@
   /* .fields is display:flex for the inline edit form; here the rows should
      stack full-width instead, so the title field has room to grow. */
   details.add .fields { display: block; margin-top: 0.85rem; }
+  /* The standout hint sits outside .fields now, so it needs its own spacing. */
+  p.hint {
+    margin: 0.5rem 0 0; font-size: 0.72rem; color: var(--muted); letter-spacing: 0;
+  }
   details.add .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   details.add .row + .row { margin-top: 0.5rem; }
   .fields select {
@@ -115,6 +119,11 @@
     border: 1px solid var(--rule); border-radius: 6px; padding: 0.3rem 0.5rem;
   }
   .fields input.imdbid { width: 8.5rem; font-variant-numeric: tabular-nums; }
+  .epref {
+    flex-basis: 100%;
+    font-size: 0.75rem; color: var(--muted);
+    letter-spacing: 0.04em;
+  }
   .fields .hint {
     flex-basis: 100%; font-size: 0.72rem; color: var(--muted);
     letter-spacing: 0;
@@ -271,21 +280,31 @@
         <summary>
           Standout{% if entry.standout %} ✦{% endif %}
         </summary>
-        <div class="fields">
-          {% for ev in entry.episodes %}
-          <form method="post" action="{{ url_for('standout') }}">
-            <input type="hidden" name="id" value="{{ ev['id'] }}">
-            <input type="hidden" name="on" value="{{ 0 if ev['standout'] else 1 }}">
-            <button type="submit">
-              {{ '✦ ' if ev['standout'] }}{% if ev['season'] is not none and ev['episode'] is not none %}S{{ ev['season'] }} E{{ ev['episode'] }}{% else %}{{ ev['title'] }}{% endif %}{% if ev['episode_title'] %} — {{ ev['episode_title'] }}{% endif %}
-            </button>
-          </form>
-          {% endfor %}
-          <span class="hint">
-            One episode, not the night. Keep it rare — it only means something
-            because it is.
-          </span>
-        </div>
+        {% for ev in entry.episodes %}
+        <form method="post" action="{{ url_for('standout') }}">
+          <input type="hidden" name="id" value="{{ ev['id'] }}">
+          <div class="fields">
+            <span class="epref">
+              {{- '✦ ' if ev['standout'] }}
+              {%- if ev['season'] is not none and ev['episode'] is not none %}S{{ ev['season'] }} E{{ ev['episode'] }}{% else %}{{ ev['title'] }}{% endif %}
+              {%- if ev['episode_title'] %} — {{ ev['episode_title'] }}{% endif -%}
+            </span>
+            <input class="wide" type="text" name="note" maxlength="500"
+                   placeholder="Why it stood out (optional)"
+                   value="{{ ev['standout_note'] or '' }}">
+            {% if ev['standout'] %}
+            <button type="submit" name="on" value="1">Save</button>
+            <button type="submit" name="on" value="0">Unmark</button>
+            {% else %}
+            <button type="submit" name="on" value="1">Mark</button>
+            {% endif %}
+          </div>
+        </form>
+        {% endfor %}
+        <p class="hint">
+          One episode, not the night. Keep it rare — it only means something
+          because it is. The note survives un-marking.
+        </p>
       </details>
       {% endif %}
       {% if entry.media_type == 'episode' %}

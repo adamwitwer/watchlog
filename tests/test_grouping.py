@@ -21,12 +21,13 @@ def check(name, condition):
 
 def row(id=1, title="Reacher", episode_title=None, season=4, episode=1,
         watched_at="2026-09-02T23:00:00+00:00", media_type="episode",
-        service="Plex", year=2022, imdb_id="tt9288030", standout=0):
+        service="Plex", year=2022, imdb_id="tt9288030", standout=0, standout_note=None):
     return {
         "id": id, "title": title, "episode_title": episode_title,
         "season": season, "episode": episode, "watched_at": watched_at,
         "media_type": media_type, "service": service, "year": year,
         "imdb_id": imdb_id, "standout": standout,
+        "standout_note": standout_note,
     }
 
 
@@ -112,6 +113,30 @@ check("an ordinary night is not", group([row(id=3)])[0]["standout"] is False)
 film = group([row(id=4, media_type="movie", season=None, episode=None,
                   episode_title=None, standout=1)])
 check("a film can be one too", film[0]["standout"] is True)
+
+noted = group([row(id=5, episode=3, standout=1,
+                   standout_note="Hal's astonishment. Sinestro as the reveal.")])
+check("the note rides along with the entry",
+      noted[0]["standout_note"].endswith("Sinestro as the reveal."))
+check("...curled like the rest of the page, since it is prose someone typed",
+      "Hal\u2019s" in noted[0]["standout_note"])
+
+# A note on an episode nobody marked is not a note about anything.
+check("an unmarked episode's note is not shown",
+      group([row(id=6, standout=0, standout_note="left over")])[0]["standout_note"]
+      is None)
+check("a marked episode with nothing written reads as no note",
+      group([row(id=7, standout=1)])[0]["standout_note"] is None)
+
+both = group([row(id=8, episode=1, standout=1, standout_note="The box."),
+              row(id=9, episode=2, standout=1, standout_note="Sinestro.")])
+check("a night where both were the one lets both speak",
+      both[0]["standout_note"] == "The box. \u00b7 Sinestro.")
+
+mixed = group([row(id=10, episode=1, standout=1, standout_note="This one."),
+               row(id=11, episode=2, standout=0, standout_note="Not this one.")])
+check("...and only the marked ones",
+      mixed[0]["standout_note"] == "This one.")
 
 
 # --- typography --------------------------------------------------------------

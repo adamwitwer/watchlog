@@ -52,7 +52,11 @@ def _search_key(entry):
                           entry["episode_names"], entry["service"],
                           # So that typing "standout" filters the page down to
                           # them, and the rail redraws as a map of the good ones.
-                          "standout" if entry["standout"] else None)
+                          "standout" if entry["standout"] else None,
+                          # His own words about it, so the reason is findable
+                          # too -- typing "sinestro" should reach the episode
+                          # that was worth writing that down about.
+                          entry["standout_note"])
         if part
     ))
 
@@ -97,6 +101,7 @@ def _json_entry(entry):
         "imdb_id": entry["imdb_id"],
         # The only field here that is a judgement rather than an observation.
         "standout": entry["standout"],
+        "standout_note": entry["standout_note"],
     }
 
 

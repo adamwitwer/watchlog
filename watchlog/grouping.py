@@ -139,6 +139,8 @@ def group(rows):
                 "media_type": "movie",
                 "season": None,
                 "standout": bool(row["standout"]),
+                "standout_note": curly_apostrophes(row["standout_note"])
+                                 if row["standout"] else None,
             })
             continue
 
@@ -161,6 +163,15 @@ def group(rows):
             # A night is a standout if any episode in it was. Which one it was
             # is a question for the admin page, where the marking happens.
             "standout": any(r["standout"] for r in rows_in_bucket),
+            # Only the marked episodes' notes, joined the way episode titles
+            # are: on a night of two where both were the one, both get to speak.
+            # Curled like everything else on the page: it is prose, and it is
+            # the one line here someone typed by hand, so it is the most likely
+            # source of a straight apostrophe.
+            "standout_note": curly_apostrophes(" \u00b7 ".join(
+                r["standout_note"] for r in rows_in_bucket
+                if r["standout"] and (r["standout_note"] or "").strip()
+            )) or None,
         })
 
     entries.sort(key=lambda e: e["watched_at"], reverse=True)

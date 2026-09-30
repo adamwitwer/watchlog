@@ -201,6 +201,19 @@
     line-height: 1.35;
   }
 
+  /* Why it was the one. Set as an aside rather than as more metadata: the rule
+     down its left is the same accent the mark uses, so the two read as one
+     gesture. */
+  .standout-note {
+    margin: 0.55rem 0 0;
+    padding-left: 0.8rem;
+    border-left: 2px solid var(--accent);
+    color: var(--muted);
+    font-size: 0.93rem;
+    line-height: 1.45;
+    max-width: 32rem;
+  }
+
   .meta {
     margin-top: 0.55rem;
     font-size: 0.76rem;
@@ -460,6 +473,11 @@
       </p>
       {% if entry.episode_names %}
       <p class="epname">{{ entry.episode_names }}</p>
+      {% endif %}
+      {% if entry.standout_note %}
+      {#- The only sentence on this page written by a person rather than
+          assembled from a sensor. It gets the accent rule to say so. #}
+      <p class="standout-note">{{ entry.standout_note }}</p>
       {% endif %}
       <p class="meta">
         <span>{{ entry.date_label }}</span>
