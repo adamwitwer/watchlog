@@ -245,6 +245,10 @@ def _decorate(entries, by_id=None):
         entry["editable"] = None
         if by_id and len(entry["ids"]) == 1 and entry["media_type"] == "episode":
             entry["editable"] = by_id.get(entry["ids"][0])
+        # Every event behind the entry, so a standout can be pinned to the one
+        # episode it was rather than to the whole night.
+        entry["episodes"] = [by_id[i] for i in entry["ids"]
+                             if by_id and i in by_id]
     return entries
 
 
@@ -396,6 +400,31 @@ def edit():
     episode_title = (request.form.get("episode_title") or "").strip()[:200] or None
     db.update_details(event_id, season, episode, episode_title)
     log.info("edited event %s: S%s E%s %r", event_id, season, episode, episode_title)
+    _republish()
+    return redirect(url_for("index"))
+
+
+@app.post("/standout")
+def standout():
+    """Mark one episode or film as a standout, or take it back.
+
+    Deliberately one bit and deliberately rare -- about one episode in a good
+    season. A five-point scale would demand a verdict on every entry and get a
+    shrug for most of them; this is the only thing in the log that is a
+    judgement rather than something a sensor observed, so it is worth keeping
+    scarce enough to mean something.
+    """
+    if not _authorised():
+        return "Not found", 404
+
+    try:
+        event_id = int(request.form.get("id", ""))
+    except ValueError:
+        return redirect(url_for("index", error="which entry?"))
+
+    on = request.form.get("on") == "1"
+    db.set_standout(event_id, on)
+    log.info("%s event %s as a standout", "marked" if on else "unmarked", event_id)
     _republish()
     return redirect(url_for("index"))
 

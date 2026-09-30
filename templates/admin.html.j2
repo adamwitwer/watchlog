@@ -266,6 +266,28 @@
         <input type="hidden" name="ids" value="{{ entry.id_list }}">
         <button type="submit">Delete</button>
       </form>
+      {% if entry.episodes %}
+      <details class="edit">
+        <summary>
+          Standout{% if entry.standout %} ✦{% endif %}
+        </summary>
+        <div class="fields">
+          {% for ev in entry.episodes %}
+          <form method="post" action="{{ url_for('standout') }}">
+            <input type="hidden" name="id" value="{{ ev['id'] }}">
+            <input type="hidden" name="on" value="{{ 0 if ev['standout'] else 1 }}">
+            <button type="submit">
+              {{ '✦ ' if ev['standout'] }}{% if ev['season'] is not none and ev['episode'] is not none %}S{{ ev['season'] }} E{{ ev['episode'] }}{% else %}{{ ev['title'] }}{% endif %}{% if ev['episode_title'] %} — {{ ev['episode_title'] }}{% endif %}
+            </button>
+          </form>
+          {% endfor %}
+          <span class="hint">
+            One episode, not the night. Keep it rare — it only means something
+            because it is.
+          </span>
+        </div>
+      </details>
+      {% endif %}
       {% if entry.media_type == 'episode' %}
       {#- A link, not a form: it only fills in the add form below, and adding
           still takes a click on Add. #}

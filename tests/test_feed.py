@@ -207,6 +207,39 @@ check("being up to date on a running show is never held against you",
 db.set_season_lengths("tt-industry", {3: 3})
 
 
+# --- standouts ---------------------------------------------------------------
+# The only field in the feed that came from a person rather than from a sensor
+# or from arithmetic, which is exactly why a reader wants it.
+
+print("\nstandouts")
+
+check("nothing is a standout until someone says so",
+      all(e["standout"] is False for e in doc["entries"]))
+
+with db.connect() as conn:
+    one = conn.execute(
+        "SELECT id FROM events WHERE title = 'Industry' AND episode = 5"
+    ).fetchone()["id"]
+db.set_standout(one, True)
+
+marked = json.loads(render.build_json()[0])
+industry_entry = next(e for e in marked["entries"] if e["title"] == "Industry")
+check("a marked episode marks the night it was watched on",
+      industry_entry["standout"] is True)
+check("other nights are untouched",
+      sum(1 for e in marked["entries"] if e["standout"]) == 1)
+
+industry_show = next(s for s in marked["shows"] if s["title"] == "Industry")
+check("the season carries a count, so a show can be ranked by them",
+      industry_show["standouts"] == 1)
+check("a season with none says zero rather than nothing",
+      all(s["standouts"] == 0 for s in marked["shows"] if s["title"] != "Industry"))
+
+db.set_standout(one, False)
+check("taking the mark back leaves no trace",
+      not any(e["standout"] for e in json.loads(render.build_json()[0])["entries"]))
+
+
 # --- the feed and the page cannot disagree ----------------------------------
 
 print("\nagreement with the page")

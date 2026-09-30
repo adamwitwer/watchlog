@@ -138,6 +138,7 @@ def group(rows):
                 "imdb_id": row["imdb_id"],
                 "media_type": "movie",
                 "season": None,
+                "standout": bool(row["standout"]),
             })
             continue
 
@@ -157,6 +158,9 @@ def group(rows):
             "imdb_id": next((r["imdb_id"] for r in rows_in_bucket if r["imdb_id"]), None),
             "media_type": "episode",
             "season": single_season(rows_in_bucket),
+            # A night is a standout if any episode in it was. Which one it was
+            # is a question for the admin page, where the marking happens.
+            "standout": any(r["standout"] for r in rows_in_bucket),
         })
 
     entries.sort(key=lambda e: e["watched_at"], reverse=True)

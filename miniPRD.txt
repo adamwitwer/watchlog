@@ -688,3 +688,29 @@ RISKS AND OPEN QUESTIONS
 
     The deploy script is still worth having and is not built yet. The README now at least
     says to restart the long-running services.
+
+33. Standouts -- a rating system that is one bit wide. Adam's idea, and a better one than
+    the five-star scheme we kept declining: a scale forces a verdict on everything, and
+    almost everything lands on 3 or 4, so it carries nearly no information. A rare binary
+    carries information *because* it is rare. Roughly one episode in a good season. It
+    also costs nothing on the nights you feel nothing.
+
+    Marked on the EVENT, not the entry. The data settled it: 247 of 266 entries are a
+    single episode, so 93% of the time the distinction does not arise -- but the other 19
+    are exactly the nights where it does, because you binged two and one of them was the
+    one.
+
+    The mark lives in the left margin rather than in the line, so scrolling a year the few
+    of them form a sparse column that reads as an index. The word appears on hover, reusing
+    the vocabulary the rail already has for its date labels. Below the rail's breakpoint
+    there is no margin to hang it in, so it joins the line and the label is dropped.
+
+    Flagged entries also carry the word "standout" in their search key, so typing it filters
+    the page down to them and the rail redraws itself as a map of the good ones. Free, and
+    the only way to see them all at once.
+
+    It is the only field in the whole log that is a judgement rather than an observation,
+    which is precisely why it earns its place: every other signal reads behaviour, and
+    behaviour lied about Blue Lights, where a co-viewed show's cadence was set by two
+    diaries rather than by how good it was. The feed carries a per-season count so shows
+    can be ranked on it.

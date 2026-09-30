@@ -71,6 +71,12 @@ where they're known, the episode title, the date, the service, and a link to IMD
   jumps to that entry. On touch it becomes a labelled month index instead, since hover
   cannot reveal anything and a 4px tick is not a tap target. Past `RAIL_MAX_TICKS` the
   fine ticks thin out so the rail stays legible however long the log gets.
+- **Standouts** — a small mark in the left margin beside the few entries worth remembering,
+  with the word revealed on hover. Rare on purpose: roughly one episode in a good season.
+  A five-point scale would demand a verdict on all 450 entries and collect a shrug for most
+  of them; one bit, given sparingly, is the only thing in the log that is a *judgement*
+  rather than something a sensor observed. Typing `standout` in the filter collects them.
+  On a narrow screen there is no margin to hang it in, so it joins the line instead.
 - **Month markers** — a heavier rule and a small label where one month becomes the next.
   The rail has always known where the boundaries are; the list itself said nothing, so
   scrolling a year of entries you had to read dates to find out. A rule rather than a
@@ -112,14 +118,14 @@ that happened, and it is what the page draws one line for. Each entry carries th
 `date` (the same one the page prints, so filtering a quarter needs no reasoning about time
 zones), the raw `watched_at` beside it, `title`, `media_type`, `detail` (`S3 E4-E6`),
 `season` and `episode_count` broken out so nothing has to parse that label back apart,
-`episode_titles`, `year`, `service` and `imdb_id`. Films carry `null` for `season` and
+`episode_titles`, `year`, `service`, `imdb_id`, and `standout`. Films carry `null` for `season` and
 `episode_count` — a film has no episodes, and saying `1` invites something downstream to
 add them up. A night that crosses a season boundary carries `null` too, because there is
 no single honest answer.
 
 Alongside `entries` is a **`shows`** block: one record per show per season, carrying what
 a reader cannot work out by eye — `pace`, `completion`, `status`, `median_gap_days`,
-`max_gap_days`, `days_since`. That arithmetic runs over every event, so it is done here
+`max_gap_days`, `days_since`, and `standouts`, the count of episodes marked by hand. That arithmetic runs over every event, so it is done here
 rather than estimated from a list.
 
 The envelope has a `version`, so a reader can refuse a shape it does not understand rather
@@ -167,6 +173,11 @@ nobody could have watched yet, so being up to date and having given up look the 
 says which seasons are still running, and the log never accuses anyone of abandoning a
 show they are waiting on.
 
+The one thing here that is **not** inferred is the standout mark. Everything above reads
+behaviour, and behaviour can lie: a show watched with someone else has a cadence set by two
+diaries rather than by how good it was. A standout is the manual override for exactly that
+blind spot, and the feed carries a per-season count so it can be ranked on.
+
 None of it decides what a favourite *is*. It produces the evidence and leaves the ranking
 to whoever asked, because the two cases above mean different things by the word and any
 single score would quietly pick one.
@@ -190,6 +201,9 @@ internet. It can:
   episode's title from TMDb. It fills the form rather than adding, so a stray click costs
   nothing and Add is still where duplicates get refused. Built for the series no sensor
   can see — Netflix, mostly — where each episode used to mean typing the same show again
+- **mark a standout** — one episode, not the night: on an evening of two it is usually one
+  of them that was the one, and saying which is the point. A toggle per episode, since
+  un-marking should be as easy as marking
 - **fix a title** — a show spelled two ways is two shows to anything that counts them, and
   until this existed the title was the one field on an entry with no way to correct it.
   Renames every spelling that shares the normalised key, but only within the same media

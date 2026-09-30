@@ -21,12 +21,12 @@ def check(name, condition):
 
 def row(id=1, title="Reacher", episode_title=None, season=4, episode=1,
         watched_at="2026-09-02T23:00:00+00:00", media_type="episode",
-        service="Plex", year=2022, imdb_id="tt9288030"):
+        service="Plex", year=2022, imdb_id="tt9288030", standout=0):
     return {
         "id": id, "title": title, "episode_title": episode_title,
         "season": season, "episode": episode, "watched_at": watched_at,
         "media_type": media_type, "service": service, "year": year,
-        "imdb_id": imdb_id,
+        "imdb_id": imdb_id, "standout": standout,
     }
 
 
@@ -95,6 +95,24 @@ edited = group([row(id=9, title="Silo", season=2, episode=4,
                     episode_title="Descent", service="Apple TV")])
 check("once typed in by hand, it reads like a Plex entry",
       edited[0]["detail"] == "S2 E4" and edited[0]["episode_names"] == "Descent")
+
+# --- standouts ---------------------------------------------------------------
+# Marked per episode, shown per entry. A night of two where one was the one
+# still reads as a standout night; which episode it was is the admin page's
+# business, since that is where the marking happens.
+
+print("\nstandouts")
+
+night = group([row(id=1, episode=1, episode_title="One"),
+               row(id=2, episode=2, episode_title="Two", standout=1)])
+check("a night is a standout if any episode in it was",
+      night[0]["standout"] is True)
+check("an ordinary night is not", group([row(id=3)])[0]["standout"] is False)
+
+film = group([row(id=4, media_type="movie", season=None, episode=None,
+                  episode_title=None, standout=1)])
+check("a film can be one too", film[0]["standout"] is True)
+
 
 # --- typography --------------------------------------------------------------
 # Plex sends straight apostrophes; Apple's metadata and anything typed on a Mac

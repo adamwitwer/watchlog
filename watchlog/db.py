@@ -27,6 +27,11 @@ CREATE TABLE IF NOT EXISTS events (
     tmdb_id         TEXT,
     dedup_key       TEXT    NOT NULL,
     hidden          INTEGER NOT NULL DEFAULT 0,
+    -- Rare on purpose: roughly one episode in a good season. A five-point
+    -- scale would demand a verdict on all 450 of these and get a shrug; one
+    -- bit, given sparingly, is the only thing here that carries real judgement
+    -- rather than inferred behaviour.
+    standout        INTEGER NOT NULL DEFAULT 0,
     raw             TEXT
 );
 
@@ -93,6 +98,7 @@ def connect():
 # moment it runs, which is long after the deploy that looked fine.
 ADDED_COLUMNS = [
     ("seasons", "airing", "INTEGER NOT NULL DEFAULT 0"),
+    ("events", "standout", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
@@ -379,6 +385,17 @@ def dedup_keys():
     with connect() as conn:
         return {r["dedup_key"] for r in
                 conn.execute("SELECT DISTINCT dedup_key FROM events")}
+
+
+def set_standout(event_id, standout=True):
+    """Mark one episode or film as a standout, or take the mark back.
+
+    One event, not a night: on a night of two episodes it is usually one of
+    them that was the one, and saying which is the entire point.
+    """
+    with connect() as conn:
+        conn.execute("UPDATE events SET standout = ? WHERE id = ?",
+                     (1 if standout else 0, event_id))
 
 
 def set_hidden(event_ids, hidden=True):

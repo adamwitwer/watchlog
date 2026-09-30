@@ -425,6 +425,42 @@ response = client.post("/match", data={"title": "The Wrong Show",
 check("fixing a match 404s without a token", response.status_code == 404)
 client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
 
+# --- standouts ---------------------------------------------------------------
+# One bit, set per episode, kept rare on purpose. The only thing in the log
+# that is a judgement rather than something a sensor observed.
+
+print("\nstandouts")
+
+target = rows(SHOW)[0]["id"]
+published.clear()
+client.post("/standout", data={"id": str(target), "on": "1"})
+check("an episode can be marked",
+      rows(SHOW)[0]["standout"] == 1)
+check("marking republishes, so the page shows it", published == ["render", "push"])
+
+published.clear()
+client.post("/standout", data={"id": str(target), "on": "0"})
+check("and unmarked again, as easily", rows(SHOW)[0]["standout"] == 0)
+check("unmarking republishes too", published == ["render", "push"])
+
+published.clear()
+response = client.post("/standout", data={"id": "not-a-number", "on": "1"})
+check("a malformed id is refused rather than crashing",
+      response.status_code == 302 and "error=" in response.headers.get("Location", ""))
+check("...and changes nothing", published == [])
+
+client.delete_cookie("watchlog_admin")
+check("marking 404s without a token",
+      client.post("/standout", data={"id": str(target), "on": "1"}).status_code == 404)
+client.set_cookie("watchlog_admin", config.ADMIN_TOKEN)
+
+client.post("/standout", data={"id": str(target), "on": "1"})
+page = client.get("/").get_data(as_text=True)
+check("the toggle is offered on every entry", 'action="/standout"' in page)
+check("a marked entry says so in its summary", "Standout ✦" in page)
+client.post("/standout", data={"id": str(target), "on": "0"})
+
+
 # --- renaming a show --------------------------------------------------------
 # A show spelled two ways is two shows to anything that counts them. The fix
 # has to reach every spelling at once, and must not reach past the media type.

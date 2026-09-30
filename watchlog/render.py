@@ -49,7 +49,10 @@ def _search_key(entry):
     """
     return search_normalize(" ".join(
         part for part in (entry["title"], entry["detail"],
-                          entry["episode_names"], entry["service"])
+                          entry["episode_names"], entry["service"],
+                          # So that typing "standout" filters the page down to
+                          # them, and the rail redraws as a map of the good ones.
+                          "standout" if entry["standout"] else None)
         if part
     ))
 
@@ -92,6 +95,8 @@ def _json_entry(entry):
         "year": entry["year"],
         "service": entry["service"],
         "imdb_id": entry["imdb_id"],
+        # The only field here that is a judgement rather than an observation.
+        "standout": entry["standout"],
     }
 
 

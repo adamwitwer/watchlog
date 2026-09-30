@@ -84,7 +84,7 @@ def show_seasons(events=None, today=None):
 
     buckets = defaultdict(lambda: {
         "names": Counter(), "imdb": Counter(), "nights": set(),
-        "episodes": set(), "unnumbered": 0,
+        "episodes": set(), "unnumbered": 0, "standouts": 0,
     })
     for row in rows:
         if row["media_type"] != "episode":
@@ -95,6 +95,7 @@ def show_seasons(events=None, today=None):
         if row["imdb_id"]:
             bucket["imdb"][row["imdb_id"]] += 1
         bucket["nights"].add(night_of(row["watched_at"]))
+        bucket["standouts"] += 1 if row["standout"] else 0
         if row["episode"] is not None:
             bucket["episodes"].add(row["episode"])
         else:
@@ -138,6 +139,9 @@ def show_seasons(events=None, today=None):
             # never missing one, and anything above it means falling behind and
             # catching up, which is a weaker signal than the medians suggest.
             "max_gap_days": max(gaps) if gaps else None,
+            # The one number here that came from a person rather than from
+            # arithmetic over timestamps.
+            "standouts": bucket["standouts"],
             "pace": _pace(gaps, watched),
             # Reported as well as used, so a reader can see why something is
             # "waiting" rather than having to trust the label.

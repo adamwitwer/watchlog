@@ -74,7 +74,7 @@ print("\nsearch keys")
 def entry(**over):
     base = {"title": "Severance", "detail": "S2 E1-E3",
             "episode_names": "Hello, Ms. Cobel", "service": "Apple TV",
-            "year": 2022}
+            "year": 2022, "standout": False}
     base.update(over)
     return base
 
@@ -84,6 +84,12 @@ check("the title is in there", "severance" in key)
 check("so is the season and episode label", "s2 e1 e3" in key)
 check("so are the episode titles", "hello ms cobel" in key)
 check("so is the service", "apple tv" in key)
+# Typing the word filters the page to them, which is the only way to see them
+# all at once -- the mark itself is scattered down a year of entries.
+check("a standout is findable by typing the word",
+      "standout" in _search_key(entry(standout=True)))
+check("...and nothing else claims to be one",
+      "standout" not in _search_key(entry()))
 check("the year is deliberately not, or every 2022 film would match",
       "2022" not in key)
 

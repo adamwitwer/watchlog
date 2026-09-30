@@ -136,7 +136,39 @@
   li.month-start:first-child { border-top-width: 1px; }
   li.month-start:first-child::before { top: 0.35rem; }
 
+  /* --- standout -------------------------------------------------------------
+     Rare by design -- roughly one episode in a good season -- so the mark goes
+     in the margin rather than the line: scrolling a year, the few of them form
+     a sparse column you can read without reading anything else. The word is
+     always in the markup for screen readers and only revealed on hover, the
+     same way the rail labels its ticks. */
+  .standout {
+    position: absolute;
+    right: calc(100% + 0.55rem);
+    top: 0.2em;
+    display: flex;
+    align-items: center;
+    color: var(--accent);
+  }
+  .standout svg { width: 0.72rem; height: 0.72rem; fill: currentColor; }
+
+  .standout-label {
+    position: absolute;
+    right: calc(100% + 0.4rem);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--muted);
+    opacity: 0;
+    transform: translateX(0.3rem);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    pointer-events: none;
+  }
+  .standout:hover .standout-label { opacity: 1; transform: none; }
+
   .title {
+    position: relative;
     font-size: clamp(1.45rem, 5vw, 2rem);
     font-weight: 600;
     letter-spacing: -0.022em;
@@ -353,6 +385,15 @@
       color: var(--muted);
     }
     .tick-label { display: none; }
+
+    /* No gutter to hang the mark in, so it joins the line instead. */
+    .standout {
+      position: static;
+      display: inline-flex;
+      margin-right: 0.3rem;
+      vertical-align: baseline;
+    }
+    .standout-label { display: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -402,6 +443,14 @@
         data-mlabel="{{ entry.month_label }}"
         {%- if entry.month_start %} class="month-start"{% endif %}>
       <p class="title">
+        {%- if entry.standout %}
+        <span class="standout">
+          <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+            <path d="M6 0 7.35 4.65 12 6 7.35 7.35 6 12 4.65 7.35 0 6 4.65 4.65Z"/>
+          </svg>
+          <span class="standout-label">Standout</span>
+        </span>
+        {%- endif %}
         {%- if entry.imdb_id %}
         <a href="https://www.imdb.com/title/{{ entry.imdb_id }}/">{{ entry.title }}</a>
         {%- else %}
