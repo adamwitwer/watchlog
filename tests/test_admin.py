@@ -161,6 +161,17 @@ check("a rejected edit does not republish", published == [])
 from datetime import timedelta, timezone  # noqa: E402
 from watchlog import plex_history, plex_webhook   # noqa: E402
 
+# _reconcile fans out further than this file is testing: TMDb season lengths and
+# a whole library sweep. Both reach the network, and on a machine with real
+# credentials -- the Pi -- the sweep imported several hundred real events into
+# this throwaway database. That pushed the fixtures out of the newest 400 rows
+# recent_events() returns, so a check on a fixture entry passed on a laptop with
+# no Plex token and failed on the Pi. Stub them where the real _reconcile is
+# restored below; render and publish are already stubbed through their shared
+# module objects.
+plex_history.sweep = lambda dry_run=False, accept=None: 0
+admin.enrich.refresh_seasons = lambda limit=100: 0
+
 _real_reconcile = plex_history._reconcile
 
 
