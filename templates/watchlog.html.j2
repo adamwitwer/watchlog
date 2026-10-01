@@ -204,6 +204,9 @@
   /* Why it was the one. Set as an aside rather than as more metadata: the rule
      down its left is the same accent the mark uses, so the two read as one
      gesture. */
+  .standout-note strong { font-weight: 600; color: var(--fg); }
+  .standout-note em { font-style: italic; }
+
   .standout-note {
     margin: 0.55rem 0 0;
     padding-left: 0.8rem;
@@ -477,7 +480,7 @@
       {% if entry.standout_note %}
       {#- The only sentence on this page written by a person rather than
           assembled from a sensor. It gets the accent rule to say so. #}
-      <p class="standout-note">{{ entry.standout_note }}</p>
+      <p class="standout-note">{{ entry.standout_note | emphasis }}</p>
       {% endif %}
       <p class="meta">
         <span>{{ entry.date_label }}</span>

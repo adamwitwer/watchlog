@@ -117,7 +117,16 @@ def episode_names(rows, limit=EPISODE_TITLES_MAX):
         named,
         key=lambda r: (r["episode"] is None, r["episode"] or 0, r["watched_at"]),
     )
-    return " \u00b7 ".join(r["episode_title"].strip() for r in ordered)
+    # The same episode can appear twice in one night -- a rewatch, or Plex
+    # scrobbling a second time -- and the episode range already collapses to
+    # "E7" rather than "E7, E7", so the titles should not say it twice either.
+    seen, titles = set(), []
+    for row in ordered:
+        title = row["episode_title"].strip()
+        if title.casefold() not in seen:
+            seen.add(title.casefold())
+            titles.append(title)
+    return " \u00b7 ".join(titles)
 
 
 def group(rows):

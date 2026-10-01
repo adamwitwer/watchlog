@@ -64,7 +64,8 @@ where they're known, the episode title, the date, the service, and a link to IMD
   little reason to cap it.
 - **Episode titles** appear for nights of up to `EPISODE_TITLES_MAX` episodes. A longer
   binge keeps the episode range and drops the titles rather than turning one scannable
-  line into a paragraph. Plex's `Episode 4` placeholders are treated as absent, since they
+  line into a paragraph. The same episode twice in a night — a rewatch, or Plex scrobbling
+  again — is named once, matching the range, which already collapses to `E7` not `E7, E7`. Plex's `Episode 4` placeholders are treated as absent, since they
   only restate the label above them.
 - **A timeline rail** runs down the right edge, one hairline per entry, so a year of
   viewing reads as texture. Hovering expands a tick and labels it with its date; clicking
@@ -81,7 +82,9 @@ where they're known, the episode title, the date, the service, and a link to IMD
   with the same accent rule down its left. It is the only prose on the page written by a
   person rather than assembled from a sensor, and it is searchable, so typing `sinestro`
   reaches the episode worth writing that down about. The note survives un-marking, because
-  un-marking is one click and writing is not.
+  un-marking is one click and writing is not. It understands `**bold**` and `*italic*` —
+  the only HTML this page accepts from a person, and the note is escaped *before* the
+  asterisks are looked at, so nothing typed into the admin form can introduce a tag.
 - **Month markers** — a heavier rule and a small label where one month becomes the next.
   The rail has always known where the boundaries are; the list itself said nothing, so
   scrolling a year of entries you had to read dates to find out. A rule rather than a

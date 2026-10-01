@@ -748,3 +748,21 @@ RISKS AND OPEN QUESTIONS
     across the 4am rollover and file it under the wrong night. The date in the form is the
     local one, because that is the date the page prints and therefore the one being
     corrected.
+
+36. Emphasis in a standout note. Adam had written one in ALL CAPS for emphasis and asked
+    for bold and italic instead. Markdown's two inline forms, since he writes markdown
+    everywhere else in this project.
+
+    The ordering inside emphasis() is the entire safety argument: the note is HTML-escaped
+    FIRST, and the asterisk patterns are applied to the escaped string. By the time any
+    asterisk is examined every angle bracket has already stopped being markup, so nothing
+    typed into the admin form can introduce a tag. Bold is read before italic so nesting
+    reads correctly. Asterisks must hug their words, so "2 * 3" is arithmetic.
+
+    The page renders the tags; the feed keeps what was typed, because a reader that is not
+    a browser wants the source rather than markup.
+
+    Also fixed, found by looking at the rendered page: after he used the new date field to
+    move the duplicate E7 back to its original night, both plays landed in one entry and
+    the episode title printed twice. The episode range already collapses duplicates to
+    "E7"; the titles now do too.

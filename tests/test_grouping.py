@@ -82,6 +82,16 @@ check("the entry carries the episode range", entries[0]["detail"] == "S4 E1-E2")
 check("the entry carries the episode names",
       entries[0]["episode_names"] == "First · Second")
 
+# One episode twice in a night -- a rewatch, or Plex scrobbling again. The
+# episode range already collapses to "E7"; the titles should match it.
+twice = group([row(id=20, episode=7, episode_title="The Jordan Boys Legacy",
+                   watched_at="2026-09-27T23:42:00+00:00"),
+               row(id=21, episode=7, episode_title="The Jordan Boys Legacy",
+                   watched_at="2026-09-28T02:52:00+00:00")])
+check("the same episode twice in a night is named once",
+      twice[0]["episode_names"] == "The Jordan Boys Legacy")
+check("...and its range says E7, not E7 twice", twice[0]["detail"] == "S4 E7")
+
 movie = group([row(media_type="movie", episode_title=None, season=None,
                    episode=None, title="Tuner")])
 check("movies stay individual and carry no episode names",

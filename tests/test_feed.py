@@ -244,6 +244,16 @@ check("the season carries a count, so a show can be ranked by them",
 check("a season with none says zero rather than nothing",
       all(s["standouts"] == 0 for s in marked["shows"] if s["title"] != "Industry"))
 
+db.set_standout(one, True, "The ring can **store snapshots** of *consciousness*.")
+page, _ = render.build_html()
+feed = json.loads(render.build_json()[0])
+noted_entry = next(e for e in feed["entries"] if e["title"] == "Industry")
+check("the page turns the markdown into tags",
+      "<strong>store snapshots</strong>" in page and "<em>consciousness</em>" in page)
+check("the feed keeps what was actually typed, for readers that are not browsers",
+      noted_entry["standout_note"]
+      == "The ring can **store snapshots** of *consciousness*.")
+
 db.set_standout(one, False)
 check("taking the mark back leaves no trace",
       not any(e["standout"] for e in json.loads(render.build_json()[0])["entries"]))

@@ -13,6 +13,7 @@ import unicodedata
 from datetime import datetime, timezone
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from markupsafe import Markup, escape
 
 from . import config, db, stats
 from .grouping import group
@@ -59,6 +60,31 @@ def _search_key(entry):
                           entry["standout_note"])
         if part
     ))
+
+
+# Two inline forms, the ones anyone reaches for: **bold** and *italic*. Both
+# require the asterisks to hug the text, so a lone asterisk in a sentence is
+# left as an asterisk.
+_BOLD = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*", re.S)
+_ITALIC = re.compile(r"\*(?=\S)([^*]+?)(?<=\S)\*", re.S)
+
+
+def emphasis(text):
+    """A note's markdown, as the only HTML this page accepts from a person.
+
+    Escaped *first*, then the two patterns are applied to the escaped string.
+    That ordering is the whole safety argument: by the time any asterisk is
+    looked at, every angle bracket and ampersand has already stopped being
+    markup, so nothing typed into the admin form can introduce a tag.
+
+    Bold before italic, so `**a *b* c**` nests the way it reads.
+    """
+    if not text:
+        return ""
+    safe = str(escape(text))
+    safe = _BOLD.sub(r"<strong>\1</strong>", safe)
+    safe = _ITALIC.sub(r"<em>\1</em>", safe)
+    return Markup(safe)
 
 
 def _date_label(iso):
@@ -170,6 +196,7 @@ def build_html():
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    env.filters["emphasis"] = emphasis
     template = env.get_template("watchlog.html.j2")
     generated = datetime.now(timezone.utc).astimezone().strftime("%B %-d, %Y at %-I:%M %p")
     return template.render(entries=entries, generated_at=generated), len(entries)

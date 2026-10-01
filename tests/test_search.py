@@ -103,6 +103,32 @@ check("a movie with no detail or episode names still folds cleanly",
                         service="Plex")) == "heat plex")
 
 
+# --- emphasis in a note ------------------------------------------------------
+# The only place a person's typing becomes HTML on this page, so the ordering
+# inside emphasis() is the whole safety argument: escape first, then look for
+# asterisks, so nothing typed into the admin form can introduce a tag.
+
+print("\nemphasis")
+
+from watchlog.render import emphasis                       # noqa: E402
+
+check("bold becomes strong", str(emphasis("a **b** c")) == "a <strong>b</strong> c")
+check("italic becomes em", str(emphasis("a *b* c")) == "a <em>b</em> c")
+check("bold is read before italic, so nesting works",
+      str(emphasis("**a *b* c**")) == "<strong>a <em>b</em> c</strong>")
+check("a lone asterisk is just an asterisk", str(emphasis("2 * 3 = 6")) == "2 * 3 = 6")
+check("so is an unclosed one", str(emphasis("*oops")) == "*oops")
+check("asterisks have to hug the words",
+      str(emphasis("a * b * c")) == "a * b * c")
+check("nothing typed in can become a tag",
+      str(emphasis("<script>alert(1)</script>"))
+      == "&lt;script&gt;alert(1)&lt;/script&gt;")
+check("...not even inside emphasis",
+      str(emphasis("*<b>x</b>*")) == "<em>&lt;b&gt;x&lt;/b&gt;</em>")
+check("an empty note renders as nothing",
+      emphasis(None) == "" and emphasis("") == "")
+
+
 # --- the rendered page -----------------------------------------------------
 
 print("\nrendered page")
