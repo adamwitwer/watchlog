@@ -243,8 +243,15 @@ def _decorate(entries, by_id=None):
         # Editing writes to one row, so it is offered only where the entry is
         # one row. A multi-episode night has no single season/episode to set.
         entry["editable"] = None
+        entry["editable_date"] = None
         if by_id and len(entry["ids"]) == 1 and entry["media_type"] == "episode":
             entry["editable"] = by_id.get(entry["ids"][0])
+            if entry["editable"]:
+                # The local date, because that is the one the page prints and
+                # therefore the one anyone would be correcting.
+                entry["editable_date"] = datetime.fromisoformat(
+                    entry["editable"]["watched_at"].replace("Z", "+00:00")
+                ).astimezone().date().isoformat()
         # Every event behind the entry, so a standout can be pinned to the one
         # episode it was rather than to the whole night.
         entry["episodes"] = [by_id[i] for i in entry["ids"]
@@ -383,6 +390,27 @@ def _optional_int(name):
     return int(raw)
 
 
+def _moved_to(existing_iso, date_text):
+    """The same moment on a different day, or None to leave it where it is.
+
+    The clock time is kept and only the calendar date moves. A play recorded at
+    22:52 was an evening, and dropping it to midnight or to a fixed hour would
+    push it across the 4am rollover and file it under the wrong night. The date
+    typed in is the *local* one, because that is the date the page prints.
+    """
+    if not date_text:
+        return None
+    try:
+        chosen = datetime.strptime(date_text.strip(), "%Y-%m-%d").date()
+    except (ValueError, AttributeError):
+        raise _BadField("date must be a real date")
+    was = datetime.fromisoformat(existing_iso.replace("Z", "+00:00")).astimezone()
+    if was.date() == chosen:
+        return None
+    return was.replace(year=chosen.year, month=chosen.month,
+                       day=chosen.day).astimezone(timezone.utc).isoformat()
+
+
 @app.post("/edit")
 def edit():
     if not _authorised():
@@ -392,14 +420,21 @@ def edit():
         event_id = int(request.form.get("id", ""))
         season = _optional_int("season")
         episode = _optional_int("episode")
+        with db.connect() as conn:
+            row = conn.execute("SELECT watched_at FROM events WHERE id = ?",
+                               (event_id,)).fetchone()
+        if not row:
+            raise _BadField("no such entry")
+        watched_at = _moved_to(row["watched_at"], request.form.get("date"))
     except (ValueError, _BadField) as exc:
         # Say so rather than silently discarding what was typed.
         log.warning("rejected edit: %s", exc)
         return redirect(url_for("index", error=str(exc)))
 
     episode_title = (request.form.get("episode_title") or "").strip()[:200] or None
-    db.update_details(event_id, season, episode, episode_title)
-    log.info("edited event %s: S%s E%s %r", event_id, season, episode, episode_title)
+    db.update_details(event_id, season, episode, episode_title, watched_at)
+    log.info("edited event %s: S%s E%s %r%s", event_id, season, episode,
+             episode_title, f" moved to {watched_at[:10]}" if watched_at else "")
     _republish()
     return redirect(url_for("index"))
 

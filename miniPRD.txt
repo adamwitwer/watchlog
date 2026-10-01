@@ -733,3 +733,18 @@ RISKS AND OPEN QUESTIONS
     apostrophe curling, so "Hal's" would have put the first straight apostrophe back on a
     page that has none. It is the most likely source of one, being the only hand-typed
     prose there.
+
+35. A date field on the edit form. Adam reported that marking a standout "updated the date
+    to today". It had not: Plex had recorded a second play of Lanterns S1E7 twenty minutes
+    earlier, the admin showed it at the top, and the note landed on the new row rather than
+    the original. Both rows ended up marked.
+
+    The request stands on its own, though -- the edit form could change season, episode and
+    episode title but not the date, so a manual entry typed against the wrong day, or a
+    duplicate that should have been a different date, had no fix short of SQL.
+
+    Moving a date keeps the clock time and changes only the calendar day. A play recorded
+    at 22:52 was an evening; dropping it to midnight or to a fixed hour would push it
+    across the 4am rollover and file it under the wrong night. The date in the form is the
+    local one, because that is the date the page prints and therefore the one being
+    corrected.

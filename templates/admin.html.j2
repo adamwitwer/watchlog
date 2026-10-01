@@ -318,6 +318,9 @@
         <form method="post" action="{{ url_for('edit') }}">
           <input type="hidden" name="id" value="{{ entry.editable['id'] }}">
           <div class="fields">
+            <label for="d{{ entry.editable['id'] }}">Watched</label>
+            <input class="date" type="date" id="d{{ entry.editable['id'] }}"
+                   name="date" value="{{ entry.editable_date }}">
             <label for="s{{ entry.editable['id'] }}">Season</label>
             <input class="num" type="number" min="0" step="1" inputmode="numeric"
                    id="s{{ entry.editable['id'] }}" name="season"

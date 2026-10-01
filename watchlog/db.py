@@ -200,20 +200,25 @@ def recent_events(limit=50):
         ).fetchall()
 
 
-def update_details(event_id, season, episode, episode_title):
-    """Set the fields a sensor couldn't supply.
+def update_details(event_id, season, episode, episode_title, watched_at=None):
+    """Set the fields a sensor couldn't supply, or got wrong.
 
     Only ever called from the admin form. The enricher writes imdb_id, tmdb_id
-    and year and never these three, so a hand-typed correction is not at risk of
-    being overwritten later. dedup_key is left alone too -- it is what stops the
+    and year and never these, so a hand-typed correction is not at risk of
+    being overwritten later. dedup_key is left alone -- it is what stops the
     same night being recorded twice, and rewriting it here would break that.
+
+    watched_at moves the entry to a different day. Passing None leaves it, which
+    is the common case: most edits are filling in a season and episode the Apple
+    TV never reported.
     """
     with connect() as conn:
         conn.execute(
             """UPDATE events
-                  SET season = ?, episode = ?, episode_title = ?
+                  SET season = ?, episode = ?, episode_title = ?,
+                      watched_at = COALESCE(?, watched_at)
                 WHERE id = ?""",
-            (season, episode, episode_title, event_id),
+            (season, episode, episode_title, watched_at, event_id),
         )
 
 

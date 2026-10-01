@@ -197,8 +197,10 @@ internet. It can:
 
 - **delete** an entry — hiding rather than destroying, so it can be restored, and
   republishing immediately
-- **edit** season, episode and episode title on any entry backed by a single event, which
-  is every Apple TV entry, because the device reports none of the three
+- **edit** the date, season, episode and episode title on any entry backed by a single
+  event, which is every Apple TV entry, because the device reports none of them. Moving
+  the date keeps the clock time: a play recorded late in the evening must not be dropped
+  across the 4am rollover and filed under the wrong night
 - **add** an entry outright, resolving the IMDb link and year from the title
 - **log the next episode** — every episode entry has a link that opens the add form already
   filled in: the show, the service it was last watched on, the episode after the highest

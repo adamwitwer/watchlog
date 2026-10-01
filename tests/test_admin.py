@@ -154,6 +154,33 @@ check("a rejected edit changes nothing",
       intact["season"] == 4 and intact["episode_title"] == "Kept")
 check("a rejected edit does not republish", published == [])
 
+# Moving an entry to a different day: the clock time is kept, because a play
+# recorded late in the evening must not be dropped across the 4am rollover and
+# filed under the wrong night.
+moved_id = rows(SHOW)[0]["id"]
+before = rows(SHOW)[0]["watched_at"]
+client.post("/edit", data={"id": str(moved_id), "season": "4", "date": "2021-06-11"})
+after = rows(SHOW)[0]["watched_at"]
+check("the date can be corrected from the edit form",
+      str(night_of(after)) == "2021-06-11")
+check("...keeping the time of day it was actually watched",
+      after[11:19] == before[11:19])
+
+client.post("/edit", data={"id": str(moved_id), "season": "4", "date": "2021-06-11"})
+check("saving the same date again changes nothing",
+      rows(SHOW)[0]["watched_at"] == after)
+
+published.clear()
+response = client.post("/edit", data={"id": str(moved_id), "date": "the eleventh"})
+check("a date that isn't one is refused",
+      "error=" in response.headers.get("Location", "")
+      and rows(SHOW)[0]["watched_at"] == after and published == [])
+
+client.post("/edit", data={"id": str(moved_id), "season": "4", "episode": "5",
+                           "episode_title": "The Test", "date": DAY})
+check("and it can be put back", str(night_of(rows(SHOW)[0]["watched_at"])) == DAY)
+
+
 # --- health ----------------------------------------------------------------
 # Four moving parts, every one of them silent when it is working. These lines
 # are the only thing that separates healthy from dead.
@@ -716,6 +743,8 @@ check("each entry shows what it resolved to", "no IMDb match" in page
       or "imdb.com/title/" in page)
 check("the edit form is offered for single-event entries",
       'name="episode_title"' in page)
+check("...with the date it currently has, so moving it is not retyping it",
+      re.search(r'name="date" value="\d{4}-\d{2}-\d{2}"', page) is not None)
 check("an error is shown when one is passed back",
       "must be a whole number"
       in client.get("/?error=season+must+be+a+whole+number").get_data(as_text=True))
