@@ -6,6 +6,7 @@ time, not here, so the grouping rules can change without touching the record.
 import logging
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 
 from . import config
 
@@ -182,7 +183,72 @@ def insert_event(event):
             f"INSERT INTO events ({columns}) VALUES ({placeholders})",
             list(event.values()),
         )
+        if event["media_type"] == "episode":
+            hide_lead_ins(conn, event["title"], event["watched_at"])
         return cursor.lastrowid
+
+
+def lead_ins(conn, title, watched_at):
+    """Ids of the night's lead-ins: last week's episode, re-played for its ending.
+
+    Watching the final fifteen minutes of the previous episode before starting
+    the next one crosses the 90% mark like any viewing, so Plex logs it -- and
+    usually days after the first time, well outside the dedup window. Every
+    repeat in the log as of 2026-10-02 but one had exactly this shape: Lanterns
+    1x1 then 1x2, Furious 1x5 then 1x6, Vox Machina 4x4 then 4x5.
+
+    A lead-in is an episode already in the log, followed next that night by an
+    episode of the same show that is not. That second half is what keeps
+    a genuine rewatch: a whole season replayed is all repeats with nothing new
+    after them, and a single episode put on again stands alone, so neither
+    matches. Both need episode numbers -- an Apple TV row has none, and its
+    key is per-night, so it would look new every time.
+
+    Hidden rows do not count as already watched. A deletion usually says the
+    first one was not a real viewing -- Vox Machina 4x4 was deleted on 21 June
+    and properly watched on the 25th -- and hiding the real one as a repeat of
+    it would lose the episode entirely.
+    """
+    from .grouping import night_of, normalize
+    show, night = normalize(title), night_of(watched_at)
+    rows = [r for r in conn.execute(
+                """SELECT id, title, watched_at, dedup_key, hidden FROM events
+                    WHERE media_type = 'episode'
+                      AND season IS NOT NULL AND episode IS NOT NULL
+                      AND ABS(julianday(watched_at) - julianday(?)) < 1""",
+                (watched_at,))
+            if normalize(r["title"]) == show and night_of(r["watched_at"]) == night]
+
+    def repeat(r):
+        return conn.execute(
+            """SELECT 1 FROM events WHERE dedup_key = ? AND id != ?
+                  AND hidden = 0 AND julianday(watched_at) < julianday(?)""",
+            (r["dedup_key"], r["id"], r["watched_at"])).fetchone() is not None
+
+    def when(r):
+        return datetime.fromisoformat(r["watched_at"].replace("Z", "+00:00"))
+
+    # Only the episode directly before the new one. A season replayed in one
+    # sitting that then runs on into new ground keeps all but its last.
+    rows.sort(key=when)
+    return [r["id"] for r, after in zip(rows, rows[1:])
+            if not r["hidden"] and repeat(r) and not repeat(after)
+            and after["dedup_key"] != r["dedup_key"]]
+
+
+def hide_lead_ins(conn, title, watched_at):
+    """Hide the night's lead-ins. Only ever hides, so a deletion stays deleted.
+
+    Evaluated over the whole night rather than for the one row just written,
+    because reconcile reads history newest first: the new episode often lands
+    before the lead-in that preceded it.
+    """
+    doomed = lead_ins(conn, title, watched_at)
+    if doomed:
+        conn.executemany("UPDATE events SET hidden = 1 WHERE id = ?",
+                         [(i,) for i in doomed])
+        log.info("hid %d lead-in(s) of %s: %s", len(doomed), title, doomed)
+    return doomed
 
 
 def visible_events():

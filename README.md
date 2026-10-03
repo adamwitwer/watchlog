@@ -333,7 +333,7 @@ Five systemd units on the Pi, all enabled at boot:
 python -m watchlog.plex_history --reconcile --dry-run   # what the timer would import
 python -m watchlog.plex_history --sweep --dry-run       # what the library says is missing
 python -m watchlog.render                               # render without publishing
-python -m tests.test_grouping   # and test_admin, test_feed, test_search, test_sweep;
+python -m tests.test_grouping   # and test_admin, test_feed, test_lead_ins, test_search, test_sweep;
                                 # test_tracker and test_listener need pyatv, so the Pi
 ```
 
