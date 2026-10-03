@@ -234,6 +234,25 @@ check("nothing was duplicated by either run",
       state("Family Share") == [1, 1] and state("Keep This") == [0])
 
 
+# --- an episode watched on the Apple TV --------------------------------------
+
+print("\nan episode watched on the Apple TV")
+
+# The Apple TV reports no episode numbers, so its row is keyed by show and
+# night, and keeps that key after the numbers are typed in on the admin page.
+# Widow's Bay 1x1, watched there and then marked played in Plex days later,
+# came back as a second entry because the sweep only compared keys.
+db.insert_event({
+    "watched_at": "2026-06-20T03:00:00+00:00", "source": "appletv",
+    "service": "Apple TV", "media_type": "episode", "title": "Swept Show",
+    "season": 9, "episode": 1, "dedup_key": "swept show|appletv|2026-06-19",
+})
+library((9, 1, "Welcome", MARKED))
+check("an Apple TV row with its numbers filled in counts as watched",
+      plex_history.sweep() == 0)
+check("...so nothing was added", (9, 1, "plex-sweep") not in logged())
+
+
 # --- the heartbeat ----------------------------------------------------------
 
 print("\nsaying it ran")

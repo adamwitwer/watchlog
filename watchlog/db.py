@@ -224,18 +224,23 @@ def lead_ins(conn, title, watched_at):
     from .grouping import night_of, normalize
     show, night = normalize(title), night_of(watched_at)
     rows = [r for r in conn.execute(
-                """SELECT id, title, watched_at, dedup_key, hidden FROM events
+                """SELECT id, title, watched_at, season, episode, hidden FROM events
                     WHERE media_type = 'episode'
                       AND season IS NOT NULL AND episode IS NOT NULL
                       AND ABS(julianday(watched_at) - julianday(?)) < 1""",
                 (watched_at,))
             if normalize(r["title"]) == show and night_of(r["watched_at"]) == night]
 
+    # By show and number, not dedup_key: an Apple TV row keeps its per-night
+    # key after the season and episode are filled in by hand, so its key never
+    # says which episode it was.
     def repeat(r):
-        return conn.execute(
-            """SELECT 1 FROM events WHERE dedup_key = ? AND id != ?
-                  AND hidden = 0 AND julianday(watched_at) < julianday(?)""",
-            (r["dedup_key"], r["id"], r["watched_at"])).fetchone() is not None
+        return any(normalize(p["title"]) == show for p in conn.execute(
+            """SELECT title FROM events
+                WHERE media_type = 'episode' AND season = ? AND episode = ?
+                  AND id != ? AND hidden = 0
+                  AND julianday(watched_at) < julianday(?)""",
+            (r["season"], r["episode"], r["id"], r["watched_at"])))
 
     def when(r):
         return datetime.fromisoformat(r["watched_at"].replace("Z", "+00:00"))
@@ -245,7 +250,7 @@ def lead_ins(conn, title, watched_at):
     rows.sort(key=when)
     return [r["id"] for r, after in zip(rows, rows[1:])
             if not r["hidden"] and repeat(r) and not repeat(after)
-            and after["dedup_key"] != r["dedup_key"]]
+            and (after["season"], after["episode"]) != (r["season"], r["episode"])]
 
 
 def hide_lead_ins(conn, title, watched_at):
@@ -472,10 +477,23 @@ def dedup_keys():
     Hidden ones matter most: they are the entries that were deliberately
     deleted, and a sweep that re-imported them would undo that quietly and
     keep doing it every day.
+
+    Also the key each row would have by its numbers, where it has them. An
+    Apple TV row is keyed by show and night, and keeps that key after its
+    season and episode are filled in by hand -- so on its stored key alone,
+    Widow's Bay 1x1 watched on the Apple TV looked absent, and the sweep
+    imported it again the day the episode was marked played in Plex.
     """
+    from .grouping import normalize
+    keys = set()
     with connect() as conn:
-        return {r["dedup_key"] for r in
-                conn.execute("SELECT DISTINCT dedup_key FROM events")}
+        for r in conn.execute(
+                "SELECT dedup_key, title, media_type, season, episode FROM events"):
+            keys.add(r["dedup_key"])
+            if r["media_type"] == "movie" or None not in (r["season"], r["episode"]):
+                keys.add(f"{normalize(r['title'])}|{r['media_type']}"
+                         f"|{r['season']}|{r['episode']}")
+    return keys
 
 
 def set_standout(event_id, standout=True, note=None):

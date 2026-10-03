@@ -109,6 +109,19 @@ after = watch("Andor", 1, 4, "2026-07-08T01:30:00+00:00")
 check("a repeat after the new episode is not leading into anything",
       not hidden(after))
 
+print("\nan episode first seen on the Apple TV")
+
+# Numbered by hand afterwards: its key is still per-night, so the rule has to
+# compare show and number to know the Plex play a week later is a repeat.
+watch("Widow's Bay", None, None, "2026-09-27T03:31:34+00:00", source="appletv")
+with db.connect() as conn:
+    conn.execute("UPDATE events SET season = 1, episode = 1 "
+                 "WHERE title = 'Widow''s Bay'")
+again = watch("Widow's Bay", 1, 1, "2026-10-04T00:30:00+00:00")
+watch("Widow's Bay", 1, 2, "2026-10-04T01:20:00+00:00")
+check("a repeat of an Apple TV episode is still a lead-in", hidden(again))
+
+
 print("\nwhat does not count")
 
 watch("Pluribus", 1, 2, "2026-07-01T01:00:00+00:00")
