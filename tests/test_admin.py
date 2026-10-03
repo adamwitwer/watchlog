@@ -170,6 +170,21 @@ client.post("/edit", data={"id": str(moved_id), "season": "4", "date": "2021-06-
 check("saving the same date again changes nothing",
       rows(SHOW)[0]["watched_at"] == after)
 
+# Plex's history still has the play at the old time. Reconcile reads it again
+# within the hour, and must recognise the moved entry rather than import the
+# original back -- which is exactly what happened to Lanterns 1x7 in September.
+replayed = dict(rows(SHOW)[0])
+replayed.pop("id")
+replayed.update(watched_at=before, original_watched_at=None)
+check("reconcile does not re-import an entry that was moved away",
+      db.is_duplicate(replayed))
+
+client.post("/edit", data={"id": str(moved_id), "season": "4", "date": "2021-06-01"})
+check("a second move keeps the first time, the one Plex has",
+      db.is_duplicate(replayed))
+check("...and the import path agrees", db.insert_event(replayed) is None)
+client.post("/edit", data={"id": str(moved_id), "season": "4", "date": "2021-06-11"})
+
 published.clear()
 response = client.post("/edit", data={"id": str(moved_id), "date": "the eleventh"})
 check("a date that isn't one is refused",

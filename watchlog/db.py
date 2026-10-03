@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS events (
     -- Why it stood out, in his own words. The mark alone ages badly: a year on
     -- it says *that* an episode was the one and nothing about what made it.
     standout_note   TEXT,
+    -- Where the entry was before the edit form first moved it to another day.
+    -- Plex's history still has the play at that time, and reconcile matches
+    -- on time: without this, moving an entry more than the dedup window away
+    -- makes the next reconcile import the original straight back.
+    original_watched_at TEXT,
     raw             TEXT
 );
 
@@ -104,6 +109,7 @@ ADDED_COLUMNS = [
     ("seasons", "airing", "INTEGER NOT NULL DEFAULT 0"),
     ("events", "standout", "INTEGER NOT NULL DEFAULT 0"),
     ("events", "standout_note", "TEXT"),
+    ("events", "original_watched_at", "TEXT"),
 ]
 
 
@@ -151,15 +157,27 @@ def get_meta(key, default=None):
     return row["value"] if row else default
 
 
+def _nearby(conn, event):
+    """An equivalent event recorded near this one in time, or None.
+
+    Near either where an entry is now or where it was before it was moved: a
+    moved entry is still the record of the play Plex has at the old time.
+    """
+    hours = config.DEDUP_WINDOW_HOURS
+    return conn.execute(
+        """SELECT id FROM events
+           WHERE dedup_key = ?
+             AND (ABS(julianday(watched_at) - julianday(?)) * 24 < ?
+                  OR ABS(julianday(original_watched_at) - julianday(?)) * 24 < ?)""",
+        (event["dedup_key"], event["watched_at"], hours,
+         event["watched_at"], hours),
+    ).fetchone()
+
+
 def is_duplicate(event):
     """Has an equivalent event already been recorded nearby in time?"""
     with connect() as conn:
-        return conn.execute(
-            """SELECT id FROM events
-               WHERE dedup_key = ?
-                 AND ABS(julianday(watched_at) - julianday(?)) * 24 < ?""",
-            (event["dedup_key"], event["watched_at"], config.DEDUP_WINDOW_HOURS),
-        ).fetchone() is not None
+        return _nearby(conn, event) is not None
 
 
 def insert_event(event):
@@ -168,13 +186,7 @@ def insert_event(event):
     Returns the new row id, or None if this was a duplicate.
     """
     with connect() as conn:
-        existing = conn.execute(
-            """SELECT id FROM events
-               WHERE dedup_key = ?
-                 AND ABS(julianday(watched_at) - julianday(?)) * 24 < ?""",
-            (event["dedup_key"], event["watched_at"], config.DEDUP_WINDOW_HOURS),
-        ).fetchone()
-        if existing:
+        if _nearby(conn, event):
             return None
 
         columns = ", ".join(event)
@@ -276,15 +288,19 @@ def update_details(event_id, season, episode, episode_title, watched_at=None):
 
     watched_at moves the entry to a different day. Passing None leaves it, which
     is the common case: most edits are filling in a season and episode the Apple
-    TV never reported.
+    TV never reported. The first move also keeps where it came from, in
+    original_watched_at; later moves leave that alone, since it is the sensor's
+    time that reconcile will meet again, not some intermediate correction.
     """
     with connect() as conn:
         conn.execute(
             """UPDATE events
                   SET season = ?, episode = ?, episode_title = ?,
+                      original_watched_at = COALESCE(original_watched_at,
+                          CASE WHEN ? IS NOT NULL THEN watched_at END),
                       watched_at = COALESCE(?, watched_at)
                 WHERE id = ?""",
-            (season, episode, episode_title, watched_at, event_id),
+            (season, episode, episode_title, watched_at, watched_at, event_id),
         )
 
 
