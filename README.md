@@ -196,7 +196,9 @@ where they can be argued with.
 ### The admin page
 
 Private to the LAN and the Tailnet, 404s without its token, never exposed to the
-internet. It can:
+internet. That last part is enforced, not just intended: `watchlog/lan.py` 404s any
+request to the admin page or the webhook from an address outside the LAN or the
+Tailnet, so a stray port forward or UPnP mapping exposes nothing. It can:
 
 - **delete** an entry — hiding rather than destroying, so it can be restored, and
   republishing immediately

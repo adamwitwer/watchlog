@@ -1,7 +1,8 @@
 """The delete surface.
 
-Deliberately small and deliberately private: it binds to the LAN and the
-Tailnet, never to the internet, and is the only interaction Watchlog asks for.
+Deliberately small and deliberately private: it answers the LAN and the
+Tailnet, never the internet (lan.py enforces that per request), and is the only
+interaction Watchlog asks for.
 
 Deleting hides rather than destroys, so a mistaken delete can be undone. An
 entry on the page may be several events -- a night of episodes -- so deleting
@@ -27,11 +28,14 @@ from pathlib import Path
 from flask import (Flask, make_response, redirect, render_template,
                    request, url_for)
 
-from . import config, db, enrich, publish, render
+from . import config, db, enrich, lan, publish, render
 from .grouping import group, normalize
 
 log = logging.getLogger("watchlog.admin")
 app = Flask(__name__, template_folder=str(config.ROOT / "templates"))
+# The forms are a few lines of text. Anything near this size is not one of them.
+app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024
+lan.restrict(app)
 
 COOKIE = "watchlog_admin"
 

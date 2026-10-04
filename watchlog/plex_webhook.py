@@ -2,7 +2,8 @@
 
 Plex Pass fires media.scrobble at 90% watched. Webhooks cannot carry custom
 headers or basic auth, so the endpoint is protected by an unguessable path
-segment instead. It binds to the LAN and is never forwarded.
+segment instead. It is never forwarded, and lan.py refuses any request that
+arrives from outside the LAN or Tailnet in case it ever is.
 """
 import hmac
 import json
@@ -13,11 +14,16 @@ from datetime import datetime, timezone
 
 from flask import Flask, request
 
-from . import config, db, publish, render
+from . import config, db, lan, publish, render
 from .grouping import normalize
 
 log = logging.getLogger("watchlog.plex")
 app = Flask(__name__)
+# Plex attaches the poster as a JPEG beside the JSON payload, usually well under
+# a megabyte. The cap is generous on purpose: a scrobble refused for size is lost
+# until the hourly reconcile, so this only has to stop an unbounded body.
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+lan.restrict(app)
 
 # Rendering and pushing on every event would mean a round trip to the web host
 # per episode during a binge. Collect for a minute, then publish once.
