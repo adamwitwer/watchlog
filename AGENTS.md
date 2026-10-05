@@ -5,29 +5,14 @@ its decisions are in `miniPRD.txt`; how it runs, and how each part has failed, i
 `README.md`. This file holds what is open right now and the conventions that are easy
 to break.
 
-## Open: confirm the first Plex scrobble after the LAN gate (deployed 2026-10-04)
+## The LAN gate and Plex
 
-`watchlog/lan.py` (commit `954afcd`) makes the webhook and the admin page 404 any
-request from outside loopback, the private ranges, or Tailscale's 100.64.0.0/10. It was
-deployed to the Pi on 2026-10-04 with every suite passing, and a request from a Mac on
-the LAN reached both apps. **No real Plex delivery had arrived through it yet.** The last
-one before the deploy was about 16 hours earlier.
-
-The risk is narrow but would be silent: if PMS ever reaches the Pi from an address the
-gate does not count as local, every scrobble gets a 404, and the hourly reconcile backfills
-the entries, so nothing looks wrong on the page. To check, after something finishes on
-Plex:
-
-```
-journalctl -u watchlog-webhook --since today | grep -E "recorded|refused"
-```
-
-`recorded …` means it worked: delete this section. `refused POST /plex/… from <addr>` means
-the gate is blocking Plex. Find out why that address is not on the LAN before widening
-`is_local`, rather than adding the address as an exception.
-
-The admin page's "Plex webhook delivered …" health line tells you the same thing without
-the log: if it keeps ageing while reconcile keeps importing, deliveries are being dropped.
+`watchlog/lan.py` returns 404 for any request from outside loopback, the private ranges and
+Tailscale's 100.64.0.0/10. The first real scrobble arrived through it on 2026-10-04 at
+22:59, with no refusals. If deliveries ever stop, check
+`journalctl -u watchlog-webhook | grep refused`. Reconcile backfills dropped scrobbles,
+so the page won't show the problem. Find out why the Plex host's address isn't local
+before widening `is_local`.
 
 ## Conventions
 
