@@ -82,5 +82,28 @@ check("a scrobble from the LAN still reaches the handler",
       post(plex_webhook.app, "/plex/test-secret", "192.168.1.30",
            data={"payload": "{}"}).status_code == 204)
 
+print("\nserved by waitress")
+from watchlog import lan  # noqa: E402
+
+calls = []
+_real_serve = lan.waitress.serve
+lan.waitress.serve = lambda app, **kw: calls.append((app, kw))
+try:
+    lan.serve(admin.app, 8421)
+    lan.serve(plex_webhook.app, 8420)
+finally:
+    lan.waitress.serve = _real_serve
+(a_app, a_kw), (w_app, w_kw) = calls
+check("admin is served by waitress on its port", a_app is admin.app and a_kw["port"] == 8421)
+check("webhook is served by waitress on its port", w_app is plex_webhook.app and w_kw["port"] == 8420)
+check("still all interfaces: restrict() is the gate, not the bind",
+      a_kw["host"] == "0.0.0.0" and w_kw["host"] == "0.0.0.0")
+check("no trusted proxy, so X-Forwarded-For can't change remote_addr",
+      "trusted_proxy" not in a_kw and "trusted_proxy" not in w_kw)
+check("the server enforces each app's body cap",
+      a_kw["max_request_body_size"] == admin.app.config["MAX_CONTENT_LENGTH"]
+      and w_kw["max_request_body_size"] == plex_webhook.app.config["MAX_CONTENT_LENGTH"])
+check("no Server header", a_kw["ident"] is None)
+
 print(f"\n{'ALL PASS' if not failures else str(len(failures)) + ' FAILED: ' + ', '.join(failures)}")
 sys.exit(1 if failures else 0)

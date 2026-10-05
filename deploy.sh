@@ -35,9 +35,24 @@ test -x "$PYTHON" || { echo "no venv here -- is this the Pi?" >&2; exit 1; }
 
 if [ "$pull" = yes ]; then
     say "Pulling"
+    before="$(git hash-object deploy.sh)"
     git pull --ff-only
+    # Bash keeps running the copy of this script it started with, so a pull that
+    # changed deploy.sh would otherwise be deployed by the old steps. Start over
+    # as the new script, without pulling again.
+    if [ "$(git hash-object deploy.sh)" != "$before" ]; then
+        echo "  deploy.sh changed; restarting as the new version"
+        exec ./deploy.sh --no-pull "$@"
+    fi
 fi
 git --no-pager log --oneline -1
+
+# Before the tests, which import everything: a dependency added to
+# requirements.txt is installed before anything tries to use it, and a missing
+# one fails the suites rather than the services after their restart.
+say "Dependencies"
+./venv/bin/pip install --quiet --disable-pip-version-check -r requirements.txt
+echo "  up to date"
 
 # Tests before anything is restarted, so a broken commit cannot take the
 # sensors down with it.

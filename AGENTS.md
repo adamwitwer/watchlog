@@ -19,10 +19,16 @@ before widening `is_local`.
 - **Deploy with `./deploy.sh` on the Pi** (`ssh adam@raspberrypi`, repo at
   `~/Projects/watchlog`). It runs every suite before restarting anything, and the restart is
   the step that fails silently if it is skipped (README, "Staying alive").
-- **`deploy.sh` does not `pip install`.** A new entry in `requirements.txt` needs an install
-  step added to the script first. Otherwise the services fail at import on their next
-  restart, after the suites have passed. This is why the webhook and admin page still run
-  on Flask's development server rather than waitress.
+- **`deploy.sh` installs `requirements.txt` before the tests** (since 2026-10-05), so a new
+  dependency is in place before anything imports it, and a missing one fails the suites
+  instead of the services. If a pull changes `deploy.sh` itself, the script restarts as the
+  new version (`exec ./deploy.sh --no-pull`), because bash would otherwise finish running
+  the old copy.
+- **The webhook and admin page run under waitress**, through `lan.serve()`. Keep it free of
+  `trusted_proxy`: nothing proxies in front of these apps, and `lan.restrict()` relies on
+  `remote_addr` being the real peer. waitress logs no per-request access lines (the
+  development server did); the app's own lines, such as `recorded …` and `refused …`, are the
+  ones to grep.
 - **Test "outside" with real public addresses.** Python's `ipaddress` counts the
   documentation ranges (203.0.113.0/24 and friends) as private, so a test that uses one as
   an internet caller passes for the wrong reason. `tests/test_lan.py` caught exactly that.

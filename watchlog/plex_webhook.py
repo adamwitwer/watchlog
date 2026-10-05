@@ -154,7 +154,7 @@ def main():
     )
     db.init()
     db.record_start("watchlog-webhook")
-    app.run(host="0.0.0.0", port=config.WEBHOOK_PORT)
+    lan.serve(app, config.WEBHOOK_PORT)
 
 
 if __name__ == "__main__":

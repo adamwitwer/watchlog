@@ -17,6 +17,7 @@ stranger that there is anything here at all.
 import ipaddress
 import logging
 
+import waitress
 from flask import request
 
 log = logging.getLogger("watchlog.lan")
@@ -47,3 +48,23 @@ def restrict(app):
                         request.remote_addr)
             return "Not found", 404
     return app
+
+
+def serve(app, port):
+    """Run `app` under waitress rather than Flask's development server.
+
+    Still 0.0.0.0, for the DHCP reason above: restrict() is the gate, not the
+    bind address. waitress is given no trusted_proxy, so it leaves
+    X-Forwarded-For alone and remote_addr stays the real peer, which is the
+    one thing restrict() depends on. The body cap is repeated here so an
+    oversized request is refused while it is still arriving, not after Flask
+    has buffered it, and ident=None drops the Server header.
+    """
+    waitress.serve(
+        app,
+        host="0.0.0.0",
+        port=port,
+        threads=4,
+        max_request_body_size=app.config.get("MAX_CONTENT_LENGTH") or 1024 * 1024,
+        ident=None,
+    )

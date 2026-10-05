@@ -3,6 +3,8 @@ pyatv>=0.18.0
 
 # Plex webhook receiver + admin/delete UI
 Flask>=3.0
+# ...served by waitress, not Flask's development server (deploy.sh installs it)
+waitress>=3.0
 
 # Page rendering
 Jinja2>=3.1

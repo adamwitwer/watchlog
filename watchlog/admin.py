@@ -666,7 +666,7 @@ def main():
     )
     db.init()
     db.record_start("watchlog-admin")
-    app.run(host="0.0.0.0", port=config.ADMIN_PORT)
+    lan.serve(app, config.ADMIN_PORT)
 
 
 if __name__ == "__main__":
