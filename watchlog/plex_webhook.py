@@ -41,14 +41,11 @@ def _extract_guid(metadata, scheme):
     return None
 
 
-def parse_scrobble(payload):
-    """Plex payload -> an events row, or None if we don't care about it."""
-    if payload.get("event") != "media.scrobble":
-        return None
-
+def _ours(payload):
+    """The payload's Metadata, if it is a movie or episode on our account."""
     account = (payload.get("Account") or {}).get("title", "")
     if config.PLEX_ACCOUNT_TITLE and account != config.PLEX_ACCOUNT_TITLE:
-        log.info("ignoring scrobble for other account: %s", account)
+        log.info("ignoring %s for other account: %s", payload.get("event"), account)
         return None
 
     metadata = payload.get("Metadata") or {}
@@ -56,6 +53,37 @@ def parse_scrobble(payload):
     if kind not in ("movie", "episode"):
         log.info("ignoring media type: %s", kind)
         return None
+    return metadata
+
+
+def parse_start(payload):
+    """An episode starting or resuming -> (show, season, episode), else None.
+
+    Nothing is recorded for it. It is how a lead-in -- the end of last week's
+    episode, re-played before this one -- gets hidden now, rather than when
+    this episode reaches 90%, which may be another night entirely.
+    """
+    if payload.get("event") not in ("media.play", "media.resume"):
+        return None
+    metadata = _ours(payload)
+    if metadata is None or metadata.get("type") != "episode":
+        return None
+    season, episode = metadata.get("parentIndex"), metadata.get("index")
+    title = metadata.get("grandparentTitle")
+    if not title or season is None or episode is None:
+        return None
+    return title, season, episode
+
+
+def parse_scrobble(payload):
+    """Plex payload -> an events row, or None if we don't care about it."""
+    if payload.get("event") != "media.scrobble":
+        return None
+
+    metadata = _ours(payload)
+    if metadata is None:
+        return None
+    kind = metadata.get("type")
 
     now = datetime.now(timezone.utc).isoformat()
 
@@ -120,6 +148,14 @@ def plex_hook(secret):
         payload = json.loads(raw)
     except json.JSONDecodeError:
         return "", 400
+
+    started = parse_start(payload)
+    if started is not None:
+        title, season, episode = started
+        if db.hide_lead_in_before(title, season, episode,
+                                  datetime.now(timezone.utc).isoformat()):
+            schedule_publish()
+        return "", 204
 
     event = parse_scrobble(payload)
     if event is None:

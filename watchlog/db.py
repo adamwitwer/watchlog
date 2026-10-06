@@ -200,7 +200,7 @@ def insert_event(event):
         return cursor.lastrowid
 
 
-def lead_ins(conn, title, watched_at):
+def lead_ins(conn, title, watched_at, starting=None):
     """Ids of the night's lead-ins: last week's episode, re-played for its ending.
 
     Watching the final fifteen minutes of the previous episode before starting
@@ -214,6 +214,11 @@ def lead_ins(conn, title, watched_at):
     after them, and a single episode put on again stands alone, so neither
     matches. Both need episode numbers -- an Apple TV row has none, and its
     key is per-night, so it would look new every time.
+
+    `starting` is a (season, episode) that has just begun playing at
+    watched_at and is not in the log yet. It stands in for the new episode, so
+    the lead-in can go when the next episode starts rather than when it is
+    finished -- which might be days later, if it is watched in halves.
 
     Hidden rows do not count as already watched. A deletion usually says the
     first one was not a real viewing -- an episode deleted one night and
@@ -229,6 +234,10 @@ def lead_ins(conn, title, watched_at):
                       AND ABS(julianday(watched_at) - julianday(?)) < 1""",
                 (watched_at,))
             if normalize(r["title"]) == show and night_of(r["watched_at"]) == night]
+    if starting is not None:
+        # id -1 matches nothing, so the episode is judged against every row.
+        rows.append({"id": -1, "title": title, "watched_at": watched_at,
+                     "season": starting[0], "episode": starting[1], "hidden": 0})
 
     # By show and number, not dedup_key: an Apple TV row keeps its per-night
     # key after the season and episode are filled in by hand, so its key never
@@ -248,23 +257,29 @@ def lead_ins(conn, title, watched_at):
     # sitting that then runs on into new ground keeps all but its last.
     rows.sort(key=when)
     return [r["id"] for r, after in zip(rows, rows[1:])
-            if not r["hidden"] and repeat(r) and not repeat(after)
+            if r["id"] != -1 and not r["hidden"] and repeat(r) and not repeat(after)
             and (after["season"], after["episode"]) != (r["season"], r["episode"])]
 
 
-def hide_lead_ins(conn, title, watched_at):
+def hide_lead_ins(conn, title, watched_at, starting=None):
     """Hide the night's lead-ins. Only ever hides, so a deletion stays deleted.
 
     Evaluated over the whole night rather than for the one row just written,
     because reconcile reads history newest first: the new episode often lands
     before the lead-in that preceded it.
     """
-    doomed = lead_ins(conn, title, watched_at)
+    doomed = lead_ins(conn, title, watched_at, starting)
     if doomed:
         conn.executemany("UPDATE events SET hidden = 1 WHERE id = ?",
                          [(i,) for i in doomed])
         log.info("hid %d lead-in(s) of %s: %s", len(doomed), title, doomed)
     return doomed
+
+
+def hide_lead_in_before(title, season, episode, started_at):
+    """An episode has just started: hide the repeat that led into it, if any."""
+    with connect() as conn:
+        return hide_lead_ins(conn, title, started_at, (season, episode))
 
 
 def visible_events():

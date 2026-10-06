@@ -147,6 +147,72 @@ kept = watch("Iron Bridge", 1, 1, "2026-09-10T01:00:00+00:00", hidden=1)
 watch("Iron Bridge", 1, 2, "2026-09-10T02:00:00+00:00")
 check("a hidden row is never un-hidden by the rule", hidden(kept))
 
+print("\nwhen the next episode starts")
+
+# Hidden at 90% of the next episode is too late: that episode is often watched
+# in halves, and the lead-in would sit on the page until the second half. So
+# the webhook acts on Plex's media.play instead, before anything is recorded.
+import json                                          # noqa: E402
+from datetime import datetime, timedelta, timezone   # noqa: E402
+from watchlog import plex_webhook                    # noqa: E402
+
+config.PLEX_WEBHOOK_SECRET = "test-secret"
+config.PLEX_ACCOUNT_TITLE = "the-viewer"
+published = []
+plex_webhook.schedule_publish = lambda: published.append(1)
+hook = plex_webhook.app.test_client()
+
+
+def ago(**delta):
+    return (datetime.now(timezone.utc) - timedelta(**delta)).isoformat()
+
+
+def plex(event, title, season, episode, account=None):
+    return hook.post("/plex/test-secret", data={"payload": json.dumps({
+        "event": event,
+        "Account": {"title": account or config.PLEX_ACCOUNT_TITLE},
+        "Metadata": {"type": "episode", "grandparentTitle": title,
+                     "title": "Whatever", "parentIndex": season, "index": episode},
+    })})
+
+
+def count(title):
+    with db.connect() as conn:
+        return conn.execute("SELECT COUNT(*) n FROM events WHERE title = ?",
+                            (title,)).fetchone()["n"]
+
+
+watch("Harbour", 1, 2, ago(days=8))
+again = watch("Harbour", 1, 2, ago(seconds=30))
+plex("media.pause", "Harbour", 1, 3)
+check("pausing is not starting", not hidden(again))
+plex("media.play", "Harbour", 1, 3, account="someone-else")
+check("someone else's account starting it is not him", not hidden(again))
+plex("media.play", "Other Harbour", 1, 3)
+check("a different show starting does not count", not hidden(again))
+plex("media.play", "Harbour", 1, 2)
+check("re-starting the repeat itself does not count", not hidden(again))
+check("...and nothing has been published for any of that", published == [])
+
+plex("media.play", "Harbour", 1, 3)
+check("the next episode starting hides the lead-in at once", hidden(again))
+check("...and publishes, so the page loses it too", published == [1])
+check("...without recording the episode that has only just started",
+      count("Harbour") == 2)
+
+published.clear()
+plex("media.resume", "Harbour", 1, 3)
+check("resuming it later, with nothing left to hide, publishes nothing",
+      published == [])
+
+watch("Shoreline", 2, 1, ago(days=30))
+watch("Shoreline", 2, 2, ago(days=29))
+again = watch("Shoreline", 2, 1, ago(seconds=30))
+plex("media.play", "Shoreline", 2, 2)
+check("starting another repeat -- a rewatch in progress -- hides nothing",
+      not hidden(again))
+
+
 print("\nthe backfill tool")
 
 # Rows from before the rule: written straight in, so nothing hid them.
