@@ -61,11 +61,11 @@ db.init()
 
 print("\nthe lead-in")
 
-watch("Lanterns", 1, 1, "2026-08-17T03:14:24+00:00")
-again = watch("Lanterns", 1, 1, "2026-08-24T01:34:41+00:00")
+watch("Night Shift", 1, 1, "2026-08-17T02:00:00+00:00")
+again = watch("Night Shift", 1, 1, "2026-08-24T01:30:00+00:00")
 check("a repeat is recorded at first -- nothing follows it yet",
       again is not None and not hidden(again))
-nxt = watch("Lanterns", 1, 2, "2026-08-24T02:31:37+00:00")
+nxt = watch("Night Shift", 1, 2, "2026-08-24T02:30:00+00:00")
 check("the next episode that night hides the repeat", hidden(again))
 check("...and is itself shown", not hidden(nxt))
 check("the original viewing a week earlier is untouched",
@@ -73,39 +73,39 @@ check("the original viewing a week earlier is untouched",
 
 print("\nreconcile order: newest first")
 
-watch("Furious", 1, 5, "2026-08-11T02:00:00+00:00")
-nxt = watch("Furious", 1, 6, "2026-08-18T03:10:00+00:00")
-again = watch("Furious", 1, 5, "2026-08-18T02:12:17+00:00")
+watch("Low Tide", 1, 5, "2026-08-11T02:00:00+00:00")
+nxt = watch("Low Tide", 1, 6, "2026-08-18T03:10:00+00:00")
+again = watch("Low Tide", 1, 5, "2026-08-18T02:10:00+00:00")
 check("a lead-in arriving after its successor is still hidden", hidden(again))
 check("...and the successor still shown", not hidden(nxt))
 
 print("\nacross a season boundary")
 
-watch("Vox", 3, 10, "2026-05-01T01:00:00+00:00")
-again = watch("Vox", 3, 10, "2026-06-20T00:30:00+00:00")
-watch("Vox", 4, 1, "2026-06-20T01:20:00+00:00")
+watch("Ember Road", 3, 10, "2026-05-01T01:00:00+00:00")
+again = watch("Ember Road", 3, 10, "2026-06-20T00:30:00+00:00")
+watch("Ember Road", 4, 1, "2026-06-20T01:20:00+00:00")
 check("last season's finale before the premiere is a lead-in", hidden(again))
 
 print("\nrewatches that are real")
 
-watch("Marlow", 1, 1, "2026-01-11T23:00:00+00:00")
-alone = watch("Marlow", 1, 1, "2026-04-09T23:11:41+00:00")
+watch("Quiet Lane", 1, 1, "2026-01-11T23:00:00+00:00")
+alone = watch("Quiet Lane", 1, 1, "2026-04-09T23:00:00+00:00")
 check("one episode put on again, alone, stays", not hidden(alone))
 
 for n in (1, 2, 3):
-    watch("Severance", 1, n, f"2026-02-0{n}T01:00:00+00:00")
-binge = [watch("Severance", 1, n, f"2026-03-01T0{n}:00:00+00:00") for n in (1, 2, 3)]
+    watch("Glass House", 1, n, f"2026-02-0{n}T01:00:00+00:00")
+binge = [watch("Glass House", 1, n, f"2026-03-01T0{n}:00:00+00:00") for n in (1, 2, 3)]
 check("a season replayed in one sitting stays, all of it",
       not any(hidden(i) for i in binge))
-watch("Severance", 1, 4, "2026-03-01T03:50:00+00:00")
+watch("Glass House", 1, 4, "2026-03-01T03:50:00+00:00")
 check("...even when it runs on into an episode never seen before",
       not hidden(binge[0]) and not hidden(binge[1]))
 check("...except the one right before it, which is a lead-in by shape",
       hidden(binge[2]))
 
-watch("Andor", 1, 4, "2026-07-01T01:00:00+00:00")
-watch("Andor", 1, 5, "2026-07-08T00:00:00+00:00")
-after = watch("Andor", 1, 4, "2026-07-08T01:30:00+00:00")
+watch("Far Shore", 1, 4, "2026-07-01T01:00:00+00:00")
+watch("Far Shore", 1, 5, "2026-07-08T00:00:00+00:00")
+after = watch("Far Shore", 1, 4, "2026-07-08T01:30:00+00:00")
 check("a repeat after the new episode is not leading into anything",
       not hidden(after))
 
@@ -113,38 +113,38 @@ print("\nan episode first seen on the Apple TV")
 
 # Numbered by hand afterwards: its key is still per-night, so the rule has to
 # compare show and number to know the Plex play a week later is a repeat.
-watch("Widow's Bay", None, None, "2026-09-27T03:31:34+00:00", source="appletv")
+watch("Gull's Harbour", None, None, "2026-09-27T03:00:00+00:00", source="appletv")
 with db.connect() as conn:
     conn.execute("UPDATE events SET season = 1, episode = 1 "
-                 "WHERE title = 'Widow''s Bay'")
-again = watch("Widow's Bay", 1, 1, "2026-10-04T00:30:00+00:00")
-watch("Widow's Bay", 1, 2, "2026-10-04T01:20:00+00:00")
+                 "WHERE title = 'Gull''s Harbour'")
+again = watch("Gull's Harbour", 1, 1, "2026-10-04T00:30:00+00:00")
+watch("Gull's Harbour", 1, 2, "2026-10-04T01:20:00+00:00")
 check("a repeat of an Apple TV episode is still a lead-in", hidden(again))
 
 
 print("\nwhat does not count")
 
-watch("Pluribus", 1, 2, "2026-07-01T01:00:00+00:00")
-again = watch("Pluribus", 1, 2, "2026-07-09T00:00:00+00:00")
-watch("Slow Horses", 5, 1, "2026-07-09T01:00:00+00:00")
+watch("Paper Moon", 1, 2, "2026-07-01T01:00:00+00:00")
+again = watch("Paper Moon", 1, 2, "2026-07-09T00:00:00+00:00")
+watch("Other Show", 5, 1, "2026-07-09T01:00:00+00:00")
 check("a different show afterwards does not hide it", not hidden(again))
-watch("Pluribus", None, None, "2026-07-09T01:30:00+00:00", source="appletv")
+watch("Paper Moon", None, None, "2026-07-09T01:30:00+00:00", source="appletv")
 check("nor does an Apple TV row, which has no episode number to be new",
       not hidden(again))
-watch("Pluribus", 1, 3, "2026-07-10T01:00:00+00:00")
+watch("Paper Moon", 1, 3, "2026-07-10T01:00:00+00:00")
 check("nor the next episode on a different night", not hidden(again))
 
 print("\ndeletions")
 
-gone = watch("Alien Earth", 1, 6, "2026-09-01T01:00:00+00:00", hidden=1)
-again = watch("Alien Earth", 1, 6, "2026-09-08T00:30:00+00:00")
-watch("Alien Earth", 1, 7, "2026-09-08T01:30:00+00:00")
+gone = watch("Cold Front", 1, 6, "2026-09-01T01:00:00+00:00", hidden=1)
+again = watch("Cold Front", 1, 6, "2026-09-08T00:30:00+00:00")
+watch("Cold Front", 1, 7, "2026-09-08T01:30:00+00:00")
 check("after a deleted first viewing, the second is the real one and stays",
       not hidden(again))
 check("...and the deletion stays deleted", hidden(gone))
 
-kept = watch("Task", 1, 1, "2026-09-10T01:00:00+00:00", hidden=1)
-watch("Task", 1, 2, "2026-09-10T02:00:00+00:00")
+kept = watch("Iron Bridge", 1, 1, "2026-09-10T01:00:00+00:00", hidden=1)
+watch("Iron Bridge", 1, 2, "2026-09-10T02:00:00+00:00")
 check("a hidden row is never un-hidden by the rule", hidden(kept))
 
 print("\nthe backfill tool")
@@ -157,9 +157,9 @@ with db.connect() as conn:
         conn.execute(
             """INSERT INTO events (watched_at, source, service, media_type,
                                    title, season, episode, dedup_key)
-               VALUES (?, 'plex', 'Plex', 'episode', 'Knight', 1, ?, ?)""",
+               VALUES (?, 'plex', 'Plex', 'episode', 'Old Mill', 1, ?, ?)""",
             (when, ep, f"knight|episode|1|{ep}"))
-    old = conn.execute("SELECT id FROM events WHERE title = 'Knight' "
+    old = conn.execute("SELECT id FROM events WHERE title = 'Old Mill' "
                        "AND watched_at LIKE '2026-01-12T01%'").fetchone()["id"]
 
 spec = importlib.util.spec_from_file_location("hide_lead_ins",

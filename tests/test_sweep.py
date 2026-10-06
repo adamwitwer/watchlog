@@ -240,7 +240,7 @@ print("\nan episode watched on the Apple TV")
 
 # The Apple TV reports no episode numbers, so its row is keyed by show and
 # night, and keeps that key after the numbers are typed in on the admin page.
-# Widow's Bay 1x1, watched there and then marked played in Plex days later,
+# An episode watched there and then marked played in Plex days later
 # came back as a second entry because the sweep only compared keys.
 db.insert_event({
     "watched_at": "2026-06-20T03:00:00+00:00", "source": "appletv",

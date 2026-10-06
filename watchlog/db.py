@@ -205,9 +205,8 @@ def lead_ins(conn, title, watched_at):
 
     Watching the final fifteen minutes of the previous episode before starting
     the next one crosses the 90% mark like any viewing, so Plex logs it -- and
-    usually days after the first time, well outside the dedup window. Every
-    repeat in the log as of 2026-10-02 but one had exactly this shape: Lanterns
-    1x1 then 1x2, Furious 1x5 then 1x6, Vox Machina 4x4 then 4x5.
+    usually days after the first time, well outside the dedup window. When
+    this was written, all but one repeat in the log had exactly this shape.
 
     A lead-in is an episode already in the log, followed next that night by an
     episode of the same show that is not. That second half is what keeps
@@ -217,9 +216,9 @@ def lead_ins(conn, title, watched_at):
     key is per-night, so it would look new every time.
 
     Hidden rows do not count as already watched. A deletion usually says the
-    first one was not a real viewing -- Vox Machina 4x4 was deleted on 21 June
-    and properly watched on the 25th -- and hiding the real one as a repeat of
-    it would lose the episode entirely.
+    first one was not a real viewing -- an episode deleted one night and
+    properly watched a few nights later -- and hiding the real one as a repeat
+    of it would lose the episode entirely.
     """
     from .grouping import night_of, normalize
     show, night = normalize(title), night_of(watched_at)
@@ -481,8 +480,8 @@ def dedup_keys():
     Also the key each row would have by its numbers, where it has them. An
     Apple TV row is keyed by show and night, and keeps that key after its
     season and episode are filled in by hand -- so on its stored key alone,
-    Widow's Bay 1x1 watched on the Apple TV looked absent, and the sweep
-    imported it again the day the episode was marked played in Plex.
+    an episode watched on the Apple TV looked absent, and the sweep imported
+    it again the day the episode was marked played in Plex.
     """
     from .grouping import normalize
     keys = set()

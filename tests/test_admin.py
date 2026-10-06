@@ -172,7 +172,7 @@ check("saving the same date again changes nothing",
 
 # Plex's history still has the play at the old time. Reconcile reads it again
 # within the hour, and must recognise the moved entry rather than import the
-# original back -- which is exactly what happened to Lanterns 1x7 in September.
+# original back -- which is exactly what happened in September.
 replayed = dict(rows(SHOW)[0])
 replayed.pop("id")
 replayed.update(watched_at=before, original_watched_at=None)
